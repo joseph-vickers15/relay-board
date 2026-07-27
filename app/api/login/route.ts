@@ -35,6 +35,8 @@ export async function POST(request: NextRequest) {
     role: person.role,
   });
 
+  await sql`INSERT INTO login_events (person_id) VALUES (${person.id})`;
+
   const response = NextResponse.json({
     success: true,
     mustChangePassword: person.must_change_password,

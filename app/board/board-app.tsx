@@ -290,6 +290,14 @@ export default function BoardApp({ session }: { session: SessionPayload }) {
                   Admin
                 </Link>
               )}
+              {(session.role === 'Director' || session.role === 'SVP') && (
+                <Link
+                  href="/insights"
+                  className="rounded-lg border border-white/15 px-4 py-2 text-sm text-white/70 hover:bg-white/5"
+                >
+                  Insights
+                </Link>
+              )}
               <LogoutButton />
             </div>
           </div>
