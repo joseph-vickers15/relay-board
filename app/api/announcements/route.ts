@@ -2,18 +2,62 @@ import { NextRequest, NextResponse } from 'next/server';
 import { sql } from '@/lib/db';
 import { getSession } from '@/lib/session';
 
-// Creates an announcement and automatically cascades it to EVERYONE
-// below the author in the org chart (their direct reports, their
-// reports' reports, all the way down).
+const LEADER_ROLES = ['Director', 'SVP'];
+const MANAGER_ROLES = ['Manager', 'Senior Manager'];
+
+// Creates an announcement and sends it to a specific set of recipients,
+// with the allowed set depending on the sender's role:
+// - Manager/Senior Manager: their own direct reports (default: all of them)
+// - Director/SVP: anyone below them in the org chart, their choice
+// - Tier 3: always every IC in the company, no picker
 export async function POST(request: NextRequest) {
   const session = await getSession();
   if (!session) {
     return NextResponse.json({ error: 'Not logged in.' }, { status: 401 });
   }
 
-  const { title, body } = await request.json();
+  const { title, body, recipientIds } = await request.json();
   if (!title || !body) {
     return NextResponse.json({ error: 'Title and body are required.' }, { status: 400 });
+  }
+
+  let finalRecipientIds: string[];
+
+  if (session.role === 'Tier 3') {
+    const rows = await sql`SELECT id FROM people WHERE role = 'IC'`;
+    finalRecipientIds = rows.map((r) => r.id);
+  } else if (MANAGER_ROLES.includes(session.role)) {
+    const directReports = await sql`
+      SELECT id FROM people WHERE manager_id = ${session.personId}
+    `;
+    const allowedIds = new Set(directReports.map((r) => r.id));
+    const requested: string[] = Array.isArray(recipientIds) ? recipientIds : [];
+    const chosen = requested.filter((id) => allowedIds.has(id));
+    // Default to the whole team if nothing specific was chosen.
+    finalRecipientIds = chosen.length > 0 ? chosen : Array.from(allowedIds);
+  } else if (LEADER_ROLES.includes(session.role)) {
+    const descendants = await sql`
+      WITH RECURSIVE tree AS (
+        SELECT id FROM people WHERE manager_id = ${session.personId}
+        UNION ALL
+        SELECT p.id FROM people p JOIN tree t ON p.manager_id = t.id
+      )
+      SELECT id FROM tree
+    `;
+    const allowedIds = new Set(descendants.map((r) => r.id));
+    const requested: string[] = Array.isArray(recipientIds) ? recipientIds : [];
+    finalRecipientIds = requested.filter((id) => allowedIds.has(id));
+    if (finalRecipientIds.length === 0) {
+      return NextResponse.json(
+        { error: 'Select at least one recipient.' },
+        { status: 400 }
+      );
+    }
+  } else {
+    return NextResponse.json(
+      { error: 'You are not authorized to send announcements.' },
+      { status: 403 }
+    );
   }
 
   const [announcement] = await sql`
@@ -22,16 +66,13 @@ export async function POST(request: NextRequest) {
     RETURNING id, created_at
   `;
 
-  await sql`
-    WITH RECURSIVE descendants AS (
-      SELECT id FROM people WHERE manager_id = ${session.personId}
-      UNION ALL
-      SELECT p.id FROM people p JOIN descendants d ON p.manager_id = d.id
-    )
-    INSERT INTO announcement_recipients (announcement_id, recipient_id)
-    SELECT ${announcement.id}, id FROM descendants
-    ON CONFLICT (announcement_id, recipient_id) DO NOTHING
-  `;
+  if (finalRecipientIds.length > 0) {
+    await sql`
+      INSERT INTO announcement_recipients (announcement_id, recipient_id)
+      SELECT ${announcement.id}, id FROM unnest(${finalRecipientIds}::text[]) AS id
+      ON CONFLICT (announcement_id, recipient_id) DO NOTHING
+    `;
+  }
 
   return NextResponse.json({ success: true, id: announcement.id });
 }

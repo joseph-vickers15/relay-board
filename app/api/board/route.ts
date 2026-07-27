@@ -19,14 +19,10 @@ export async function GET() {
       )
   `;
 
-  const [canCompose] = await sql`
-    SELECT EXISTS (
-      SELECT 1 FROM people WHERE manager_id = ${session.personId}
-    ) AS value
-  `;
+  const composeRoles = ['Manager', 'Senior Manager', 'Director', 'SVP', 'Tier 3'];
 
   return NextResponse.json({
     inboxCount: Number(inbox.count),
-    canCompose: canCompose.value === true,
+    canCompose: composeRoles.includes(session.role),
   });
 }
