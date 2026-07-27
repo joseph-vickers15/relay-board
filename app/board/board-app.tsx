@@ -5,21 +5,38 @@ import type { SessionPayload } from '@/lib/types';
 import LogoutButton from './logout-button';
 import AnnouncementCard, { AnnouncementItem, Category } from './announcement-card';
 import ComposeForm from './compose-form';
+import IdeaCard, { IdeaItem } from './idea-card';
+import ComposeIdeaForm from './compose-idea-form';
 
-type View = { type: 'inbox' } | { type: 'sent' } | { type: 'category'; id: number; name: string };
+type Mode = 'announcements' | 'ideas';
+type AnnouncementView =
+  | { type: 'inbox' }
+  | { type: 'sent' }
+  | { type: 'category'; id: number; name: string };
+type IdeaView = 'mine' | 'action' | 'following';
 
 export default function BoardApp({ session }: { session: SessionPayload }) {
-  const [view, setView] = useState<View>({ type: 'inbox' });
-  const [items, setItems] = useState<AnnouncementItem[]>([]);
+  const [mode, setMode] = useState<Mode>('announcements');
+
+  // --- Announcements state ---
+  const [annView, setAnnView] = useState<AnnouncementView>({ type: 'inbox' });
+  const [annItems, setAnnItems] = useState<AnnouncementItem[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [inboxCount, setInboxCount] = useState(0);
   const [canCompose, setCanCompose] = useState(false);
-  const [loading, setLoading] = useState(true);
   const [showCompose, setShowCompose] = useState(false);
   const [showNewCategory, setShowNewCategory] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
 
-  const loadSummary = useCallback(async () => {
+  // --- Ideas state ---
+  const [ideaView, setIdeaView] = useState<IdeaView>('mine');
+  const [ideaItems, setIdeaItems] = useState<IdeaItem[]>([]);
+  const [ideaActionCount, setIdeaActionCount] = useState(0);
+  const [showComposeIdea, setShowComposeIdea] = useState(false);
+
+  const [loading, setLoading] = useState(true);
+
+  const loadAnnSummary = useCallback(async () => {
     const [summaryRes, categoriesRes] = await Promise.all([
       fetch('/api/board'),
       fetch('/api/categories'),
@@ -31,30 +48,52 @@ export default function BoardApp({ session }: { session: SessionPayload }) {
     setCategories(categoriesData.categories);
   }, []);
 
-  const loadItems = useCallback(async (currentView: View) => {
+  const loadAnnItems = useCallback(async (view: AnnouncementView) => {
     setLoading(true);
     let url = '/api/announcements?scope=inbox';
-    if (currentView.type === 'sent') url = '/api/announcements?scope=sent';
-    if (currentView.type === 'category')
-      url = `/api/announcements?scope=category&categoryId=${currentView.id}`;
-
+    if (view.type === 'sent') url = '/api/announcements?scope=sent';
+    if (view.type === 'category') url = `/api/announcements?scope=category&categoryId=${view.id}`;
     const res = await fetch(url);
     const data = await res.json();
-    setItems(data.announcements);
+    setAnnItems(data.announcements);
+    setLoading(false);
+  }, []);
+
+  const loadIdeaSummary = useCallback(async () => {
+    const res = await fetch('/api/ideas/summary');
+    const data = await res.json();
+    setIdeaActionCount(data.needsActionCount);
+  }, []);
+
+  const loadIdeaItems = useCallback(async (view: IdeaView) => {
+    setLoading(true);
+    const res = await fetch(`/api/ideas?scope=${view}`);
+    const data = await res.json();
+    setIdeaItems(data.ideas);
     setLoading(false);
   }, []);
 
   useEffect(() => {
-    loadSummary();
-  }, [loadSummary]);
+    loadAnnSummary();
+    loadIdeaSummary();
+  }, [loadAnnSummary, loadIdeaSummary]);
 
   useEffect(() => {
-    loadItems(view);
-  }, [view, loadItems]);
+    if (mode === 'announcements') loadAnnItems(annView);
+  }, [mode, annView, loadAnnItems]);
 
-  function refreshAfterAction() {
-    loadItems(view);
-    loadSummary();
+  useEffect(() => {
+    if (mode === 'ideas') loadIdeaItems(ideaView);
+  }, [mode, ideaView, loadIdeaItems]);
+
+  function refreshAnnouncements() {
+    loadAnnItems(annView);
+    loadAnnSummary();
+  }
+
+  function refreshIdeas() {
+    loadIdeaItems(ideaView);
+    loadIdeaSummary();
   }
 
   async function handleCreateCategory(e: React.FormEvent) {
@@ -68,87 +107,151 @@ export default function BoardApp({ session }: { session: SessionPayload }) {
     });
     setNewCategoryName('');
     setShowNewCategory(false);
-    loadSummary();
+    loadAnnSummary();
   }
 
-  const viewTitle =
-    view.type === 'inbox' ? 'Inbox' : view.type === 'sent' ? 'Sent by me' : view.name;
+  const canSubmitIdea = session.role !== 'SVP';
+
+  const annViewTitle =
+    annView.type === 'inbox' ? 'Inbox' : annView.type === 'sent' ? 'Sent by me' : annView.name;
+
+  const ideaViewTitle =
+    ideaView === 'mine' ? 'My ideas' : ideaView === 'action' ? 'Needs my action' : 'Following';
 
   return (
     <div className="flex min-h-screen bg-playon-ink text-white">
       {/* Sidebar */}
       <aside className="w-60 shrink-0 border-r border-white/10 p-4">
-        <div className="mb-6 flex items-center gap-2 px-2">
+        <div className="mb-4 flex items-center gap-2 px-2">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
             <path d="M2 12L20 2L14 12L20 22L2 12Z" fill="#1FD3D9" />
           </svg>
           <span className="font-display text-sm font-bold">Relay Board</span>
         </div>
 
-        <nav className="space-y-0.5">
+        {/* Mode toggle */}
+        <div className="mb-4 flex rounded-lg bg-white/5 p-1 text-xs">
           <button
-            onClick={() => setView({ type: 'inbox' })}
-            className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm ${
-              view.type === 'inbox' ? 'bg-white/10 text-white' : 'text-white/60 hover:bg-white/5'
+            onClick={() => setMode('announcements')}
+            className={`flex-1 rounded-md py-1.5 font-medium ${
+              mode === 'announcements' ? 'bg-white/15 text-white' : 'text-white/50'
             }`}
           >
-            <span>Inbox</span>
-            {inboxCount > 0 && (
-              <span className="rounded-full bg-playon-teal px-1.5 py-0.5 text-[10px] font-semibold text-playon-ink">
-                {inboxCount}
+            Announcements
+          </button>
+          <button
+            onClick={() => setMode('ideas')}
+            className={`flex-1 rounded-md py-1.5 font-medium ${
+              mode === 'ideas' ? 'bg-white/15 text-white' : 'text-white/50'
+            }`}
+          >
+            Ideas
+            {ideaActionCount > 0 && (
+              <span className="ml-1 rounded-full bg-playon-teal px-1.5 py-0.5 text-[9px] font-semibold text-playon-ink">
+                {ideaActionCount}
               </span>
             )}
           </button>
+        </div>
 
-          <button
-            onClick={() => setView({ type: 'sent' })}
-            className={`flex w-full items-center rounded-lg px-3 py-2 text-sm ${
-              view.type === 'sent' ? 'bg-white/10 text-white' : 'text-white/60 hover:bg-white/5'
-            }`}
-          >
-            Sent by me
-          </button>
-
-          <p className="mt-4 px-3 text-[10px] font-semibold uppercase tracking-wide text-white/30">
-            Categories
-          </p>
-          {categories.map((c) => (
+        {mode === 'announcements' ? (
+          <nav className="space-y-0.5">
             <button
-              key={c.id}
-              onClick={() => setView({ type: 'category', id: c.id, name: c.name })}
+              onClick={() => setAnnView({ type: 'inbox' })}
               className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm ${
-                view.type === 'category' && view.id === c.id
-                  ? 'bg-white/10 text-white'
-                  : 'text-white/60 hover:bg-white/5'
+                annView.type === 'inbox' ? 'bg-white/10 text-white' : 'text-white/60 hover:bg-white/5'
               }`}
             >
-              <span>{c.name}</span>
-              {c.filed_count > 0 && (
-                <span className="text-[10px] text-white/40">{c.filed_count}</span>
+              <span>Inbox</span>
+              {inboxCount > 0 && (
+                <span className="rounded-full bg-playon-teal px-1.5 py-0.5 text-[10px] font-semibold text-playon-ink">
+                  {inboxCount}
+                </span>
               )}
             </button>
-          ))}
 
-          {showNewCategory ? (
-            <form onSubmit={handleCreateCategory} className="px-3 pt-1">
-              <input
-                autoFocus
-                value={newCategoryName}
-                onChange={(e) => setNewCategoryName(e.target.value)}
-                onBlur={() => !newCategoryName && setShowNewCategory(false)}
-                placeholder="Category name"
-                className="w-full rounded-md border border-white/15 bg-white/5 px-2 py-1 text-xs text-white outline-none focus:border-playon-teal"
-              />
-            </form>
-          ) : (
             <button
-              onClick={() => setShowNewCategory(true)}
-              className="w-full rounded-lg px-3 py-2 text-left text-xs text-white/40 hover:bg-white/5 hover:text-white/60"
+              onClick={() => setAnnView({ type: 'sent' })}
+              className={`flex w-full items-center rounded-lg px-3 py-2 text-sm ${
+                annView.type === 'sent' ? 'bg-white/10 text-white' : 'text-white/60 hover:bg-white/5'
+              }`}
             >
-              + New category
+              Sent by me
             </button>
-          )}
-        </nav>
+
+            <p className="mt-4 px-3 text-[10px] font-semibold uppercase tracking-wide text-white/30">
+              Categories
+            </p>
+            {categories.map((c) => (
+              <button
+                key={c.id}
+                onClick={() => setAnnView({ type: 'category', id: c.id, name: c.name })}
+                className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm ${
+                  annView.type === 'category' && annView.id === c.id
+                    ? 'bg-white/10 text-white'
+                    : 'text-white/60 hover:bg-white/5'
+                }`}
+              >
+                <span>{c.name}</span>
+                {c.filed_count > 0 && (
+                  <span className="text-[10px] text-white/40">{c.filed_count}</span>
+                )}
+              </button>
+            ))}
+
+            {showNewCategory ? (
+              <form onSubmit={handleCreateCategory} className="px-3 pt-1">
+                <input
+                  autoFocus
+                  value={newCategoryName}
+                  onChange={(e) => setNewCategoryName(e.target.value)}
+                  onBlur={() => !newCategoryName && setShowNewCategory(false)}
+                  placeholder="Category name"
+                  className="w-full rounded-md border border-white/15 bg-white/5 px-2 py-1 text-xs text-white outline-none focus:border-playon-teal"
+                />
+              </form>
+            ) : (
+              <button
+                onClick={() => setShowNewCategory(true)}
+                className="w-full rounded-lg px-3 py-2 text-left text-xs text-white/40 hover:bg-white/5 hover:text-white/60"
+              >
+                + New category
+              </button>
+            )}
+          </nav>
+        ) : (
+          <nav className="space-y-0.5">
+            <button
+              onClick={() => setIdeaView('action')}
+              className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm ${
+                ideaView === 'action' ? 'bg-white/10 text-white' : 'text-white/60 hover:bg-white/5'
+              }`}
+            >
+              <span>Needs my action</span>
+              {ideaActionCount > 0 && (
+                <span className="rounded-full bg-playon-teal px-1.5 py-0.5 text-[10px] font-semibold text-playon-ink">
+                  {ideaActionCount}
+                </span>
+              )}
+            </button>
+            <button
+              onClick={() => setIdeaView('mine')}
+              className={`flex w-full items-center rounded-lg px-3 py-2 text-sm ${
+                ideaView === 'mine' ? 'bg-white/10 text-white' : 'text-white/60 hover:bg-white/5'
+              }`}
+            >
+              My ideas
+            </button>
+            <button
+              onClick={() => setIdeaView('following')}
+              className={`flex w-full items-center rounded-lg px-3 py-2 text-sm ${
+                ideaView === 'following' ? 'bg-white/10 text-white' : 'text-white/60 hover:bg-white/5'
+              }`}
+            >
+              Following
+            </button>
+          </nav>
+        )}
       </aside>
 
       {/* Main */}
@@ -162,7 +265,7 @@ export default function BoardApp({ session }: { session: SessionPayload }) {
               </h1>
             </div>
             <div className="flex items-center gap-2">
-              {canCompose && (
+              {mode === 'announcements' && canCompose && (
                 <button
                   onClick={() => setShowCompose(true)}
                   className="rounded-lg bg-playon-teal px-4 py-2 text-sm font-semibold text-playon-ink hover:bg-playon-tealDark"
@@ -170,30 +273,58 @@ export default function BoardApp({ session }: { session: SessionPayload }) {
                   New announcement
                 </button>
               )}
+              {mode === 'ideas' && canSubmitIdea && (
+                <button
+                  onClick={() => setShowComposeIdea(true)}
+                  className="rounded-lg bg-playon-teal px-4 py-2 text-sm font-semibold text-playon-ink hover:bg-playon-tealDark"
+                >
+                  New idea
+                </button>
+              )}
               <LogoutButton />
             </div>
           </div>
 
-          <h2 className="mt-8 font-display text-lg font-bold text-white/90">{viewTitle}</h2>
+          <h2 className="mt-8 font-display text-lg font-bold text-white/90">
+            {mode === 'announcements' ? annViewTitle : ideaViewTitle}
+          </h2>
 
           <div className="mt-4 space-y-3">
             {loading && <p className="text-sm text-white/40">Loading…</p>}
 
-            {!loading && items.length === 0 && (
+            {mode === 'announcements' && !loading && annItems.length === 0 && (
               <div className="rounded-2xl border border-dashed border-white/15 p-8 text-center text-sm text-white/40">
                 Nothing here right now.
               </div>
             )}
 
-            {!loading &&
-              items.map((item) => (
+            {mode === 'announcements' &&
+              !loading &&
+              annItems.map((item) => (
                 <AnnouncementCard
                   key={item.id}
                   item={item}
                   categories={categories}
-                  isAuthorView={view.type === 'sent'}
-                  onAcknowledged={refreshAfterAction}
-                  onFiled={refreshAfterAction}
+                  isAuthorView={annView.type === 'sent'}
+                  onAcknowledged={refreshAnnouncements}
+                  onFiled={refreshAnnouncements}
+                />
+              ))}
+
+            {mode === 'ideas' && !loading && ideaItems.length === 0 && (
+              <div className="rounded-2xl border border-dashed border-white/15 p-8 text-center text-sm text-white/40">
+                Nothing here right now.
+              </div>
+            )}
+
+            {mode === 'ideas' &&
+              !loading &&
+              ideaItems.map((idea) => (
+                <IdeaCard
+                  key={idea.id}
+                  idea={idea}
+                  myPersonId={session.personId}
+                  onChanged={refreshIdeas}
                 />
               ))}
           </div>
@@ -205,7 +336,18 @@ export default function BoardApp({ session }: { session: SessionPayload }) {
           onClose={() => setShowCompose(false)}
           onPosted={() => {
             setShowCompose(false);
-            refreshAfterAction();
+            refreshAnnouncements();
+          }}
+        />
+      )}
+
+      {showComposeIdea && (
+        <ComposeIdeaForm
+          onClose={() => setShowComposeIdea(false)}
+          onPosted={() => {
+            setShowComposeIdea(false);
+            setIdeaView('mine');
+            refreshIdeas();
           }}
         />
       )}
