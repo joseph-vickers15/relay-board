@@ -51,16 +51,14 @@ export default function LoginPage() {
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-playon-ink text-white">
-      {/* Signature background element: a relay of chevrons, echoing the
-          logo's arrow and the idea of a message passing hand to hand */}
+      {/* Signature background element: the real PlayOn arrow, repeated
+          faintly, echoing the idea of a message passing hand to hand */}
       <div className="pointer-events-none absolute inset-0 flex items-center justify-center opacity-[0.06]">
-        <div className="flex gap-6">
+        <div className="flex gap-10">
           {Array.from({ length: 5 }).map((_, i) => (
-            <div
-              key={i}
-              className="h-64 w-24 rotate-[20deg] bg-gradient-to-b from-playon-teal to-transparent"
-              style={{ animationDelay: `${i * 120}ms` }}
-            />
+            <svg key={i} width="90" height="90" viewBox="0 0 24 24" fill="none">
+              <path d="M3 21L21 3L12 10L3 10Z" fill="#1FD3D9" />
+            </svg>
           ))}
         </div>
       </div>
@@ -68,7 +66,7 @@ export default function LoginPage() {
       <div className="relative z-10 flex min-h-screen flex-col items-center justify-center px-6">
         <div className="mb-10 flex items-center gap-2">
           <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
-            <path d="M2 12L20 2L14 12L20 22L2 12Z" fill="#1FD3D9" />
+            <path d="M3 21L21 3L12 10L3 10Z" fill="#1FD3D9" />
           </svg>
           <span className="font-display text-xl font-bold tracking-tight">
             Relay Board

@@ -125,7 +125,7 @@ export default function BoardApp({ session }: { session: SessionPayload }) {
       <aside className="w-60 shrink-0 border-r border-white/10 p-4">
         <div className="mb-4 flex items-center gap-2 px-2">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-            <path d="M2 12L20 2L14 12L20 22L2 12Z" fill="#1FD3D9" />
+            <path d="M3 21L21 3L12 10L3 10Z" fill="#1FD3D9" />
           </svg>
           <span className="font-display text-sm font-bold">Relay Board</span>
         </div>
