@@ -1,18 +1,41 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { sortedForDropdown } from '@/lib/orgChart';
 
 export default function LoginPage() {
+  const router = useRouter();
   const [selectedId, setSelectedId] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    // Step 1 only: no real auth yet. We wire this up to the database
-    // and session cookies in Step 3.
-    alert(`Would log in as: ${selectedId || '(nobody selected)'}`);
+    setError('');
+    setLoading(true);
+
+    try {
+      const res = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ personId: selectedId, password }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error || 'Something went wrong.');
+        setLoading(false);
+        return;
+      }
+
+      router.push(data.mustChangePassword ? '/change-password' : '/board');
+    } catch {
+      setError('Could not reach the server. Try again.');
+      setLoading(false);
+    }
   }
 
   return (
@@ -90,11 +113,18 @@ export default function LoginPage() {
             </button>
           </div>
 
+          {error && (
+            <p className="mt-4 rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-300">
+              {error}
+            </p>
+          )}
+
           <button
             type="submit"
-            className="mt-6 w-full rounded-lg bg-playon-teal py-2.5 text-sm font-semibold text-playon-ink transition hover:bg-playon-tealDark"
+            disabled={loading}
+            className="mt-6 w-full rounded-lg bg-playon-teal py-2.5 text-sm font-semibold text-playon-ink transition hover:bg-playon-tealDark disabled:opacity-50"
           >
-            Continue to Board
+            {loading ? 'Signing in…' : 'Continue to Board'}
           </button>
 
           <p className="mt-4 text-center text-xs text-white/30">
