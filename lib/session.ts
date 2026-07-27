@@ -1,5 +1,6 @@
 import { SignJWT, jwtVerify } from 'jose';
 import { cookies } from 'next/headers';
+import type { SessionPayload } from './types';
 
 const SESSION_COOKIE_NAME = 'relay_session';
 
@@ -13,11 +14,8 @@ function getSecretKey() {
   return new TextEncoder().encode(secret);
 }
 
-export interface SessionPayload {
-  personId: string;
-  name: string;
-  role: string;
-}
+export type { SessionPayload };
+
 
 export async function createSessionCookie(payload: SessionPayload): Promise<string> {
   return new SignJWT({ ...payload })

@@ -1,0 +1,191 @@
+'use client';
+
+import { useState } from 'react';
+
+export interface AnnouncementItem {
+  id: number;
+  title: string;
+  body: string;
+  created_at: string;
+  author_name: string;
+  author_role: string;
+  acknowledged_at?: string | null;
+}
+
+export interface Category {
+  id: number;
+  name: string;
+  filed_count: number;
+}
+
+interface StatsBreakdownRow {
+  root_id: string;
+  root_name: string;
+  total: string;
+  acknowledged: string;
+  root_acknowledged: boolean;
+}
+
+function timeAgo(dateStr: string) {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.floor(hours / 24)}d ago`;
+}
+
+export default function AnnouncementCard({
+  item,
+  categories,
+  isAuthorView,
+  onAcknowledged,
+  onFiled,
+}: {
+  item: AnnouncementItem;
+  categories: Category[];
+  isAuthorView: boolean;
+  onAcknowledged?: (id: number) => void;
+  onFiled?: (id: number) => void;
+}) {
+  const [showFileMenu, setShowFileMenu] = useState(false);
+  const [showStats, setShowStats] = useState(false);
+  const [stats, setStats] = useState<{
+    overall: { total: string; acknowledged: string };
+    breakdown: StatsBreakdownRow[];
+  } | null>(null);
+  const [loadingStats, setLoadingStats] = useState(false);
+  const [acking, setAcking] = useState(false);
+
+  async function handleAcknowledge() {
+    setAcking(true);
+    await fetch(`/api/announcements/${item.id}/acknowledge`, { method: 'POST' });
+    setAcking(false);
+    onAcknowledged?.(item.id);
+  }
+
+  async function handleFile(categoryId: number) {
+    setShowFileMenu(false);
+    await fetch(`/api/announcements/${item.id}/file`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ categoryId }),
+    });
+    onFiled?.(item.id);
+  }
+
+  async function toggleStats() {
+    if (showStats) {
+      setShowStats(false);
+      return;
+    }
+    setShowStats(true);
+    if (!stats) {
+      setLoadingStats(true);
+      const res = await fetch(`/api/announcements/${item.id}/stats`);
+      const data = await res.json();
+      setStats(data);
+      setLoadingStats(false);
+    }
+  }
+
+  return (
+    <div className="rounded-xl border border-white/10 bg-white/[0.03] p-5">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h3 className="font-display text-lg font-bold text-white">{item.title}</h3>
+          <p className="mt-0.5 text-xs text-white/40">
+            {item.author_name} · {item.author_role} · {timeAgo(item.created_at)}
+          </p>
+        </div>
+        {!isAuthorView && item.acknowledged_at && (
+          <span className="shrink-0 rounded-full bg-playon-teal/15 px-3 py-1 text-xs font-medium text-playon-teal">
+            Acknowledged
+          </span>
+        )}
+      </div>
+
+      <p className="mt-3 whitespace-pre-wrap text-sm text-white/80">{item.body}</p>
+
+      <div className="mt-4 flex flex-wrap items-center gap-2">
+        {!isAuthorView && !item.acknowledged_at && (
+          <button
+            onClick={handleAcknowledge}
+            disabled={acking}
+            className="rounded-lg bg-playon-teal px-3 py-1.5 text-xs font-semibold text-playon-ink hover:bg-playon-tealDark disabled:opacity-50"
+          >
+            {acking ? 'Marking…' : 'Acknowledge'}
+          </button>
+        )}
+
+        {!isAuthorView && (
+          <div className="relative">
+            <button
+              onClick={() => setShowFileMenu((v) => !v)}
+              className="rounded-lg border border-white/15 px-3 py-1.5 text-xs text-white/70 hover:bg-white/5"
+            >
+              File into…
+            </button>
+            {showFileMenu && (
+              <div className="absolute left-0 top-full z-10 mt-1 w-44 rounded-lg border border-white/10 bg-[#141416] p-1 shadow-xl">
+                {categories.map((c) => (
+                  <button
+                    key={c.id}
+                    onClick={() => handleFile(c.id)}
+                    className="block w-full rounded-md px-2 py-1.5 text-left text-xs text-white/80 hover:bg-white/10"
+                  >
+                    {c.name}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {isAuthorView && (
+          <button
+            onClick={toggleStats}
+            className="rounded-lg border border-white/15 px-3 py-1.5 text-xs text-white/70 hover:bg-white/5"
+          >
+            {showStats ? 'Hide acknowledgments' : 'View acknowledgments'}
+          </button>
+        )}
+      </div>
+
+      {showStats && (
+        <div className="mt-4 border-t border-white/10 pt-4">
+          {loadingStats || !stats ? (
+            <p className="text-xs text-white/40">Loading…</p>
+          ) : (
+            <>
+              <p className="text-sm font-medium text-white/80">
+                {stats.overall.acknowledged} / {stats.overall.total} acknowledged overall
+              </p>
+              <div className="mt-2 space-y-1.5">
+                {stats.breakdown.map((row) => (
+                  <div
+                    key={row.root_id}
+                    className="flex items-center justify-between rounded-lg bg-white/[0.03] px-3 py-1.5 text-xs"
+                  >
+                    <span className="text-white/70">
+                      {row.root_name}{' '}
+                      {row.root_acknowledged ? (
+                        <span className="text-playon-teal">(acknowledged)</span>
+                      ) : (
+                        <span className="text-white/30">(not yet)</span>
+                      )}
+                    </span>
+                    <span className="text-white/50">
+                      {row.acknowledged} / {row.total}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
