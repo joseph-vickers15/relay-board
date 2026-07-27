@@ -1,16 +1,27 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { sortedForDropdown } from '@/lib/orgChart';
+
+interface PersonOption {
+  id: string;
+  name: string;
+}
 
 export default function LoginPage() {
   const router = useRouter();
+  const [people, setPeople] = useState<PersonOption[]>([]);
   const [selectedId, setSelectedId] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    fetch('/api/people')
+      .then((res) => res.json())
+      .then((data) => setPeople(data.people || []));
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -85,7 +96,7 @@ export default function LoginPage() {
             <option value="" disabled>
               — Choose your name —
             </option>
-            {sortedForDropdown.map((person) => (
+            {people.map((person) => (
               <option key={person.id} value={person.id} className="bg-playon-ink">
                 {person.name}
               </option>

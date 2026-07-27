@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import Link from 'next/link';
 import type { SessionPayload } from '@/lib/types';
 import LogoutButton from './logout-button';
 import AnnouncementCard, { AnnouncementItem, Category } from './announcement-card';
@@ -280,6 +281,14 @@ export default function BoardApp({ session }: { session: SessionPayload }) {
                 >
                   New idea
                 </button>
+              )}
+              {canCompose && (
+                <Link
+                  href="/admin"
+                  className="rounded-lg border border-white/15 px-4 py-2 text-sm text-white/70 hover:bg-white/5"
+                >
+                  Admin
+                </Link>
               )}
               <LogoutButton />
             </div>
