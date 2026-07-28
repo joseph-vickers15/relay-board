@@ -19,6 +19,21 @@ async function attachEvents(ideas: any[]) {
   }));
 }
 
+async function attachFiles(ideas: any[]) {
+  if (ideas.length === 0) return ideas;
+  const ids = ideas.map((i) => i.id);
+  const files = await sql`
+    SELECT id, idea_id, file_name, file_url, file_size, content_type, uploaded_at
+    FROM idea_attachments
+    WHERE idea_id = ANY(${ids})
+    ORDER BY uploaded_at ASC
+  `;
+  return ideas.map((idea) => ({
+    ...idea,
+    attachments: files.filter((f) => f.idea_id === idea.id),
+  }));
+}
+
 export async function GET(request: NextRequest) {
   const session = await getSession();
   if (!session) {
@@ -85,7 +100,8 @@ export async function GET(request: NextRequest) {
   }
 
   const withEvents = await attachEvents(ideas);
-  return NextResponse.json({ ideas: withEvents });
+  const withFiles = await attachFiles(withEvents);
+  return NextResponse.json({ ideas: withFiles });
 }
 
 export async function POST(request: NextRequest) {

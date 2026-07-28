@@ -11,6 +11,14 @@ export interface IdeaEvent {
   actor_role: string;
 }
 
+export interface IdeaAttachment {
+  id: number;
+  file_name: string;
+  file_url: string;
+  file_size: number;
+  content_type: string | null;
+}
+
 export interface IdeaItem {
   id: number;
   title: string;
@@ -26,6 +34,7 @@ export interface IdeaItem {
   escalate_to_name: string | null;
   is_following: boolean;
   events: IdeaEvent[];
+  attachments?: IdeaAttachment[];
 }
 
 const STATUS_LABEL: Record<string, string> = {
@@ -38,6 +47,12 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 const DECISION_ROLES = ['Director', 'SVP'];
+
+function formatSize(bytes: number) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
 
 function timeAgo(dateStr: string) {
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -110,6 +125,23 @@ export default function IdeaCard({
       </div>
 
       <p className="mt-3 whitespace-pre-wrap text-sm text-white/80">{idea.body}</p>
+
+      {idea.attachments && idea.attachments.length > 0 && (
+        <div className="mt-3 space-y-1.5">
+          {idea.attachments.map((file) => (
+            <a
+              key={file.id}
+              href={file.file_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-between rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2 text-xs text-white/70 hover:bg-white/5"
+            >
+              <span className="truncate">📎 {file.file_name}</span>
+              <span className="shrink-0 text-white/30">{formatSize(file.file_size)}</span>
+            </a>
+          ))}
+        </div>
+      )}
 
       {!isClosed && idea.current_owner_name && (
         <p className="mt-2 text-xs text-white/40">

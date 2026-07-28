@@ -5,6 +5,21 @@ import { getSession } from '@/lib/session';
 const LEADER_ROLES = ['Director', 'SVP'];
 const MANAGER_ROLES = ['Manager', 'Senior Manager'];
 
+async function attachFiles(announcements: any[]) {
+  if (announcements.length === 0) return announcements;
+  const ids = announcements.map((a) => a.id);
+  const files = await sql`
+    SELECT id, announcement_id, file_name, file_url, file_size, content_type, uploaded_at
+    FROM announcement_attachments
+    WHERE announcement_id = ANY(${ids})
+    ORDER BY uploaded_at ASC
+  `;
+  return announcements.map((a) => ({
+    ...a,
+    attachments: files.filter((f) => f.announcement_id === a.id),
+  }));
+}
+
 // Creates an announcement and sends it to a specific set of recipients,
 // with the allowed set depending on the sender's role:
 // - Manager/Senior Manager: their own direct reports (default: all of them)
@@ -99,7 +114,7 @@ export async function GET(request: NextRequest) {
       WHERE a.author_id = ${session.personId}
       ORDER BY a.created_at DESC
     `;
-    return NextResponse.json({ announcements: rows, isAuthorView: true });
+    return NextResponse.json({ announcements: await attachFiles(rows), isAuthorView: true });
   }
 
   if (scope === 'category' && categoryId) {
@@ -115,7 +130,7 @@ export async function GET(request: NextRequest) {
       WHERE f.person_id = ${session.personId} AND f.category_id = ${Number(categoryId)}
       ORDER BY a.created_at DESC
     `;
-    return NextResponse.json({ announcements: rows, isAuthorView: false });
+    return NextResponse.json({ announcements: await attachFiles(rows), isAuthorView: false });
   }
 
   // default: inbox — received, not yet filed anywhere
@@ -133,5 +148,5 @@ export async function GET(request: NextRequest) {
       )
     ORDER BY a.created_at DESC
   `;
-  return NextResponse.json({ announcements: rows, isAuthorView: false });
+  return NextResponse.json({ announcements: await attachFiles(rows), isAuthorView: false });
 }

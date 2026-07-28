@@ -15,7 +15,8 @@
     "@neondatabase/serverless": "0.9.5",
     "bcryptjs": "2.4.3",
     "jose": "5.9.6",
-    "recharts": "2.12.7"
+    "recharts": "2.12.7",
+    "@vercel/blob": "0.27.1"
   },
   "devDependencies": {
     "typescript": "5.5.4",
