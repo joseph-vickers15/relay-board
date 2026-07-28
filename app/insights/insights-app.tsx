@@ -13,6 +13,8 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts';
+import type { SessionPayload } from '@/lib/types';
+import IdeaCard, { IdeaItem } from '../board/idea-card';
 
 const STATUS_LABEL: Record<string, string> = {
   submitted: 'Submitted',
@@ -45,13 +47,25 @@ function fillLast30Days(rows: { day: string; count: string }[]) {
   return result;
 }
 
-export default function InsightsApp() {
+export default function InsightsApp({ session }: { session: SessionPayload }) {
   const [data, setData] = useState<any>(null);
+  const [allIdeas, setAllIdeas] = useState<IdeaItem[]>([]);
+  const [loadingIdeas, setLoadingIdeas] = useState(true);
+
+  function loadAllIdeas() {
+    fetch('/api/insights/ideas')
+      .then((res) => res.json())
+      .then((d) => {
+        setAllIdeas(d.ideas || []);
+        setLoadingIdeas(false);
+      });
+  }
 
   useEffect(() => {
     fetch('/api/insights')
       .then((res) => res.json())
       .then(setData);
+    loadAllIdeas();
   }, []);
 
   if (!data) {
@@ -211,6 +225,32 @@ export default function InsightsApp() {
                 <span className="text-white/40">{timeAgo(p.last_login)}</span>
               </div>
             ))}
+          </div>
+        </div>
+        {/* All open ideas, company-wide */}
+        <div className="mt-6">
+          <h2 className="font-display text-sm font-bold text-white/90">
+            All open ideas (oldest activity first)
+          </h2>
+          <p className="mt-1 text-xs text-white/40">
+            Read-only — a way to see what's in flight anywhere in the company, even
+            on teams whose lead might be out or heads-down.
+          </p>
+          <div className="mt-3 space-y-3">
+            {loadingIdeas && <p className="text-xs text-white/40">Loading…</p>}
+            {!loadingIdeas && allIdeas.length === 0 && (
+              <p className="text-xs text-white/30">No open ideas right now. 🎉</p>
+            )}
+            {!loadingIdeas &&
+              allIdeas.map((idea) => (
+                <IdeaCard
+                  key={idea.id}
+                  idea={idea}
+                  myPersonId={session.personId}
+                  onChanged={loadAllIdeas}
+                  readOnly
+                />
+              ))}
           </div>
         </div>
       </div>

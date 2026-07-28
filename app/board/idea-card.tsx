@@ -68,10 +68,12 @@ export default function IdeaCard({
   idea,
   myPersonId,
   onChanged,
+  readOnly = false,
 }: {
   idea: IdeaItem;
   myPersonId: string;
   onChanged: () => void;
+  readOnly?: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [activeForm, setActiveForm] = useState<
@@ -81,7 +83,7 @@ export default function IdeaCard({
   const [busy, setBusy] = useState(false);
   const [following, setFollowing] = useState(idea.is_following);
 
-  const isMyAction = idea.current_owner_id === myPersonId;
+  const isMyAction = !readOnly && idea.current_owner_id === myPersonId;
   const isClosed = idea.status === 'implemented' || idea.status === 'declined';
   const canDecide = DECISION_ROLES.includes(idea.current_owner_role || '');
 

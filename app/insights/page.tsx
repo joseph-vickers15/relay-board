@@ -11,5 +11,5 @@ export default async function InsightsPage() {
     redirect('/board');
   }
 
-  return <InsightsApp />;
+  return <InsightsApp session={session} />;
 }
