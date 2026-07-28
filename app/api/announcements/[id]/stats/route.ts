@@ -41,11 +41,25 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
     ORDER BY root_person.name
   `;
 
+  const members = await sql`
+    WITH RECURSIVE tree AS (
+      SELECT id, id AS root FROM people WHERE manager_id = ${session.personId}
+      UNION ALL
+      SELECT p.id, t.root FROM people p JOIN tree t ON p.manager_id = t.id
+    )
+    SELECT tree.root AS root_id, p.id, p.name, p.role, ar.acknowledged_at
+    FROM tree
+    JOIN people p ON p.id = tree.id
+    LEFT JOIN announcement_recipients ar
+      ON ar.recipient_id = tree.id AND ar.announcement_id = ${announcementId}
+    ORDER BY p.name
+  `;
+
   const [overall] = await sql`
     SELECT COUNT(*) AS total, COUNT(acknowledged_at) AS acknowledged
     FROM announcement_recipients
     WHERE announcement_id = ${announcementId}
   `;
 
-  return NextResponse.json({ overall, breakdown });
+  return NextResponse.json({ overall, breakdown, members });
 }

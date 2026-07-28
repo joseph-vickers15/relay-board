@@ -35,6 +35,14 @@ interface StatsBreakdownRow {
   root_acknowledged: boolean;
 }
 
+interface StatsMember {
+  root_id: string;
+  id: string;
+  name: string;
+  role: string;
+  acknowledged_at: string | null;
+}
+
 function formatSize(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
@@ -69,9 +77,11 @@ export default function AnnouncementCard({
   const [stats, setStats] = useState<{
     overall: { total: string; acknowledged: string };
     breakdown: StatsBreakdownRow[];
+    members: StatsMember[];
   } | null>(null);
   const [loadingStats, setLoadingStats] = useState(false);
   const [acking, setAcking] = useState(false);
+  const [expandedTeam, setExpandedTeam] = useState<string | null>(null);
 
   async function handleAcknowledge() {
     setAcking(true);
@@ -196,21 +206,48 @@ export default function AnnouncementCard({
               </p>
               <div className="mt-2 space-y-1.5">
                 {stats.breakdown.map((row) => (
-                  <div
-                    key={row.root_id}
-                    className="flex items-center justify-between rounded-lg bg-white/[0.03] px-3 py-1.5 text-xs"
-                  >
-                    <span className="text-white/70">
-                      {row.root_name}{' '}
-                      {row.root_acknowledged ? (
-                        <span className="text-playon-teal">(acknowledged)</span>
-                      ) : (
-                        <span className="text-white/30">(not yet)</span>
-                      )}
-                    </span>
-                    <span className="text-white/50">
-                      {row.acknowledged} / {row.total}
-                    </span>
+                  <div key={row.root_id}>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setExpandedTeam(expandedTeam === row.root_id ? null : row.root_id)
+                      }
+                      className="flex w-full items-center justify-between rounded-lg bg-white/[0.03] px-3 py-1.5 text-xs hover:bg-white/[0.06]"
+                    >
+                      <span className="text-white/70">
+                        {expandedTeam === row.root_id ? '▾' : '▸'} {row.root_name}{' '}
+                        {row.root_acknowledged ? (
+                          <span className="text-playon-teal">(acknowledged)</span>
+                        ) : (
+                          <span className="text-white/30">(not yet)</span>
+                        )}
+                      </span>
+                      <span className="text-white/50">
+                        {row.acknowledged} / {row.total}
+                      </span>
+                    </button>
+
+                    {expandedTeam === row.root_id && (
+                      <div className="ml-4 mt-1 space-y-1 border-l border-white/10 pl-3">
+                        {stats.members
+                          .filter((m) => m.root_id === row.root_id)
+                          .map((m) => (
+                            <div
+                              key={m.id}
+                              className="flex items-center justify-between px-2 py-1 text-xs"
+                            >
+                              <span className="text-white/60">
+                                {m.name} <span className="text-white/25">· {m.role}</span>
+                              </span>
+                              {m.acknowledged_at ? (
+                                <span className="text-playon-teal">Acknowledged</span>
+                              ) : (
+                                <span className="text-white/30">Not yet</span>
+                              )}
+                            </div>
+                          ))}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
