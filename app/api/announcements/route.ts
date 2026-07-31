@@ -149,7 +149,10 @@ export async function GET(request: NextRequest) {
     });
   }
 
-  // default: inbox — received, not yet filed anywhere
+  // default: inbox — received, not yet filed anywhere.
+  // Unacknowledged items always float to the top as a group; once
+  // acknowledged, an item drops down into the acknowledged group,
+  // but within each group the arrival-order sort still applies.
   const rows = await sql`
     SELECT a.id, a.title, a.body, a.created_at, a.author_id, a.tag,
            p.name AS author_name, p.role AS author_role,
@@ -164,8 +167,13 @@ export async function GET(request: NextRequest) {
       )
       AND (${searchTerm} = '' OR a.title ILIKE ${searchPattern} OR a.body ILIKE ${searchPattern})
   `;
+  const sortedRows = applySort(rows);
+  const unacknowledged = sortedRows.filter((r) => !r.acknowledged_at);
+  const acknowledged = sortedRows.filter((r) => r.acknowledged_at);
+  const groupedRows = [...unacknowledged, ...acknowledged];
+
   return NextResponse.json({
-    announcements: await attachFiles(applySort(rows)),
+    announcements: await attachFiles(groupedRows),
     isAuthorView: false,
   });
 }
