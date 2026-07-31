@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { renderBody } from '@/lib/renderBody';
 
 export interface IdeaEvent {
   id: number;
@@ -126,7 +127,7 @@ export default function IdeaCard({
         </span>
       </div>
 
-      <p className="mt-3 whitespace-pre-wrap text-sm text-white/80">{idea.body}</p>
+      <div className="mt-3 whitespace-pre-wrap text-sm text-white/80">{renderBody(idea.body)}</div>
 
       {idea.attachments && idea.attachments.length > 0 && (
         <div className="mt-3 space-y-1.5">

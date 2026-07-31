@@ -13,6 +13,7 @@ type Mode = 'announcements' | 'ideas';
 type AnnouncementView =
   | { type: 'inbox' }
   | { type: 'sent' }
+  | { type: 'all-org' }
   | { type: 'category'; id: number; name: string };
 type IdeaView = 'mine' | 'action' | 'following';
 
@@ -56,6 +57,7 @@ export default function BoardApp({ session }: { session: SessionPayload }) {
       setLoading(true);
       let url = `/api/announcements?scope=inbox&sort=${sort}&q=${encodeURIComponent(search)}`;
       if (view.type === 'sent') url = `/api/announcements?scope=sent&sort=${sort}&q=${encodeURIComponent(search)}`;
+      if (view.type === 'all-org') url = `/api/announcements/all-org?sort=${sort}&q=${encodeURIComponent(search)}`;
       if (view.type === 'category')
         url = `/api/announcements?scope=category&categoryId=${view.id}&sort=${sort}&q=${encodeURIComponent(search)}`;
       const res = await fetch(url);
@@ -129,7 +131,13 @@ export default function BoardApp({ session }: { session: SessionPayload }) {
   const canSubmitIdea = session.role !== 'SVP';
 
   const annViewTitle =
-    annView.type === 'inbox' ? 'Inbox' : annView.type === 'sent' ? 'Sent by me' : annView.name;
+    annView.type === 'inbox'
+      ? 'Inbox'
+      : annView.type === 'sent'
+      ? 'Sent by me'
+      : annView.type === 'all-org'
+      ? 'All announcements (company-wide)'
+      : annView.name;
 
   const ideaViewTitle =
     ideaView === 'mine' ? 'My ideas' : ideaView === 'action' ? 'Needs my action' : 'Following';
@@ -194,6 +202,17 @@ export default function BoardApp({ session }: { session: SessionPayload }) {
             >
               Sent by me
             </button>
+
+            {(session.role === 'Director' || session.role === 'SVP') && (
+              <button
+                onClick={() => selectAnnView({ type: 'all-org' })}
+                className={`flex w-full items-center rounded-lg px-3 py-2 text-sm ${
+                  annView.type === 'all-org' ? 'bg-white/10 text-white' : 'text-white/60 hover:bg-white/5'
+                }`}
+              >
+                All announcements
+              </button>
+            )}
 
             <p className="mt-4 px-3 text-[10px] font-semibold uppercase tracking-wide text-white/30">
               Categories
@@ -366,7 +385,7 @@ export default function BoardApp({ session }: { session: SessionPayload }) {
                   key={item.id}
                   item={item}
                   categories={categories}
-                  isAuthorView={annView.type === 'sent'}
+                  isAuthorView={annView.type === 'sent' || annView.type === 'all-org'}
                   canDelete={
                     item.author_id === session.personId ||
                     session.role === 'Director' ||

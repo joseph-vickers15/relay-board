@@ -13,8 +13,36 @@ export default function ComposeIdeaForm({
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [files, setFiles] = useState<File[]>([]);
+  const [insertingImage, setInsertingImage] = useState(false);
   const [posting, setPosting] = useState(false);
   const [error, setError] = useState('');
+
+  async function handleInsertImage(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      setError('Please choose an image file.');
+      return;
+    }
+    if (file.size > MAX_ATTACHMENT_SIZE) {
+      setError(`Image is too large. Max size is ${MAX_ATTACHMENT_SIZE_LABEL}.`);
+      return;
+    }
+    setError('');
+    setInsertingImage(true);
+    const form = new FormData();
+    form.append('file', file);
+    const res = await fetch('/api/uploads/inline-image', { method: 'POST', body: form });
+    setInsertingImage(false);
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      setError(data.error || 'Image upload failed.');
+      return;
+    }
+    const data = await res.json();
+    setBody((prev) => (prev && !prev.endsWith('\n') ? prev + '\n' : prev) + `![image](${data.url})\n`);
+  }
 
   function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const selected = Array.from(e.target.files || []);
@@ -108,6 +136,19 @@ export default function ComposeIdeaForm({
           rows={5}
           className="mt-1.5 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none focus:border-playon-teal focus:ring-1 focus:ring-playon-teal"
         />
+        <div className="mt-1.5 flex items-center gap-2">
+          <label className="cursor-pointer text-xs text-playon-teal hover:underline">
+            {insertingImage ? 'Uploading…' : '+ Insert image'}
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handleInsertImage}
+              disabled={insertingImage}
+              className="hidden"
+            />
+          </label>
+          <span className="text-xs text-white/25">Shows inline in the message, not as a download link</span>
+        </div>
 
         <label className="mt-3 block text-xs font-medium uppercase tracking-wide text-white/40">
           Attachments <span className="normal-case text-white/25">(optional, max {MAX_ATTACHMENT_SIZE_LABEL} each)</span>

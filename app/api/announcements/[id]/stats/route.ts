@@ -4,7 +4,9 @@ import { getSession } from '@/lib/session';
 
 // Returns, for one announcement, a breakdown of acknowledgment by each
 // of the author's direct reports' teams -- e.g. "Sam Williamson's team: 9/13
-// acknowledged" -- plus an overall total. Only the author can see this.
+// acknowledged" -- plus an overall total. The author can always see this;
+// Directors/SVP can see it for any announcement, since they're allowed
+// company-wide visibility.
 export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
   const session = await getSession();
   if (!session) {
@@ -17,13 +19,23 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
     SELECT author_id FROM announcements WHERE id = ${announcementId}
   `;
 
-  if (!announcement || announcement.author_id !== session.personId) {
+  if (!announcement) {
+    return NextResponse.json({ error: 'Announcement not found.' }, { status: 404 });
+  }
+
+  const isAuthor = announcement.author_id === session.personId;
+  const isOrgAdmin = session.role === 'Director' || session.role === 'SVP';
+  if (!isAuthor && !isOrgAdmin) {
     return NextResponse.json({ error: 'Not authorized to view these stats.' }, { status: 403 });
   }
 
+  // Always root the breakdown at the actual sender, not the viewer --
+  // matters when a Director/SVP is looking at someone else's announcement.
+  const authorId = announcement.author_id;
+
   const breakdown = await sql`
     WITH RECURSIVE tree AS (
-      SELECT id, id AS root FROM people WHERE manager_id = ${session.personId}
+      SELECT id, id AS root FROM people WHERE manager_id = ${authorId}
       UNION ALL
       SELECT p.id, t.root FROM people p JOIN tree t ON p.manager_id = t.id
     )
@@ -43,7 +55,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
 
   const members = await sql`
     WITH RECURSIVE tree AS (
-      SELECT id, id AS root FROM people WHERE manager_id = ${session.personId}
+      SELECT id, id AS root FROM people WHERE manager_id = ${authorId}
       UNION ALL
       SELECT p.id, t.root FROM people p JOIN tree t ON p.manager_id = t.id
     )
