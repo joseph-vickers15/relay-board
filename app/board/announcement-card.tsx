@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { getTagColor } from '@/lib/tagColors';
 
 export interface AnnouncementAttachment {
   id: number;
@@ -15,10 +16,12 @@ export interface AnnouncementItem {
   title: string;
   body: string;
   created_at: string;
+  author_id: string;
   author_name: string;
   author_role: string;
   acknowledged_at?: string | null;
   attachments?: AnnouncementAttachment[];
+  tag?: string | null;
 }
 
 export interface Category {
@@ -49,6 +52,18 @@ function formatSize(bytes: number) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+function TagBadge({ tag }: { tag: string }) {
+  const color = getTagColor(tag);
+  return (
+    <span
+      className="shrink-0 rounded-full px-3 py-1 text-xs font-medium"
+      style={{ backgroundColor: `${color}26`, color }}
+    >
+      {tag}
+    </span>
+  );
+}
+
 function timeAgo(dateStr: string) {
   const diff = Date.now() - new Date(dateStr).getTime();
   const mins = Math.floor(diff / 60000);
@@ -63,14 +78,18 @@ export default function AnnouncementCard({
   item,
   categories,
   isAuthorView,
+  canDelete,
   onAcknowledged,
   onFiled,
+  onDeleted,
 }: {
   item: AnnouncementItem;
   categories: Category[];
   isAuthorView: boolean;
+  canDelete?: boolean;
   onAcknowledged?: (id: number) => void;
   onFiled?: (id: number) => void;
+  onDeleted?: (id: number) => void;
 }) {
   const [showFileMenu, setShowFileMenu] = useState(false);
   const [showStats, setShowStats] = useState(false);
@@ -81,7 +100,21 @@ export default function AnnouncementCard({
   } | null>(null);
   const [loadingStats, setLoadingStats] = useState(false);
   const [acking, setAcking] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [expandedTeam, setExpandedTeam] = useState<string | null>(null);
+
+  async function handleDelete() {
+    if (!confirm(`Delete "${item.title}"? This cannot be undone.`)) return;
+    setDeleting(true);
+    const res = await fetch(`/api/announcements/${item.id}`, { method: 'DELETE' });
+    setDeleting(false);
+    if (res.ok) {
+      onDeleted?.(item.id);
+    } else {
+      const data = await res.json().catch(() => ({}));
+      alert(data.error || 'Could not delete this announcement.');
+    }
+  }
 
   async function handleAcknowledge() {
     setAcking(true);
@@ -124,11 +157,14 @@ export default function AnnouncementCard({
             {item.author_name} · {item.author_role} · {timeAgo(item.created_at)}
           </p>
         </div>
-        {!isAuthorView && item.acknowledged_at && (
-          <span className="shrink-0 rounded-full bg-playon-teal/15 px-3 py-1 text-xs font-medium text-playon-teal">
-            Acknowledged
-          </span>
-        )}
+        <div className="flex shrink-0 flex-col items-end gap-1.5">
+          {item.tag && <TagBadge tag={item.tag} />}
+          {!isAuthorView && item.acknowledged_at && (
+            <span className="rounded-full bg-playon-teal/15 px-3 py-1 text-xs font-medium text-playon-teal">
+              Acknowledged
+            </span>
+          )}
+        </div>
       </div>
 
       <p className="mt-3 whitespace-pre-wrap text-sm text-white/80">{item.body}</p>
@@ -191,6 +227,16 @@ export default function AnnouncementCard({
             className="rounded-lg border border-white/15 px-3 py-1.5 text-xs text-white/70 hover:bg-white/5"
           >
             {showStats ? 'Hide acknowledgments' : 'View acknowledgments'}
+          </button>
+        )}
+
+        {canDelete && (
+          <button
+            onClick={handleDelete}
+            disabled={deleting}
+            className="ml-auto rounded-lg border border-red-500/30 px-3 py-1.5 text-xs text-red-400 hover:bg-red-500/10 disabled:opacity-50"
+          >
+            {deleting ? 'Deleting…' : 'Delete'}
           </button>
         )}
       </div>

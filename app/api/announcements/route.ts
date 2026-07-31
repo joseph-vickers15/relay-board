@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Not logged in.' }, { status: 401 });
   }
 
-  const { title, body, recipientIds } = await request.json();
+  const { title, body, recipientIds, tag } = await request.json();
   if (!title || !body) {
     return NextResponse.json({ error: 'Title and body are required.' }, { status: 400 });
   }
@@ -76,8 +76,8 @@ export async function POST(request: NextRequest) {
   }
 
   const [announcement] = await sql`
-    INSERT INTO announcements (author_id, title, body)
-    VALUES (${session.personId}, ${title}, ${body})
+    INSERT INTO announcements (author_id, title, body, tag)
+    VALUES (${session.personId}, ${title}, ${body}, ${tag || null})
     RETURNING id, created_at
   `;
 
@@ -117,7 +117,7 @@ export async function GET(request: NextRequest) {
 
   if (scope === 'sent') {
     const rows = await sql`
-      SELECT a.id, a.title, a.body, a.created_at,
+      SELECT a.id, a.title, a.body, a.created_at, a.author_id, a.tag,
              p.name AS author_name, p.role AS author_role
       FROM announcements a
       JOIN people p ON p.id = a.author_id
@@ -132,7 +132,7 @@ export async function GET(request: NextRequest) {
 
   if (scope === 'category' && categoryId) {
     const rows = await sql`
-      SELECT a.id, a.title, a.body, a.created_at,
+      SELECT a.id, a.title, a.body, a.created_at, a.author_id, a.tag,
              p.name AS author_name, p.role AS author_role,
              ar.acknowledged_at
       FROM announcement_filings f
@@ -151,7 +151,7 @@ export async function GET(request: NextRequest) {
 
   // default: inbox — received, not yet filed anywhere
   const rows = await sql`
-    SELECT a.id, a.title, a.body, a.created_at,
+    SELECT a.id, a.title, a.body, a.created_at, a.author_id, a.tag,
            p.name AS author_name, p.role AS author_role,
            ar.acknowledged_at
     FROM announcement_recipients ar

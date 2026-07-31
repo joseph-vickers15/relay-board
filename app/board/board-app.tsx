@@ -367,8 +367,14 @@ export default function BoardApp({ session }: { session: SessionPayload }) {
                   item={item}
                   categories={categories}
                   isAuthorView={annView.type === 'sent'}
+                  canDelete={
+                    item.author_id === session.personId ||
+                    session.role === 'Director' ||
+                    session.role === 'SVP'
+                  }
                   onAcknowledged={refreshAnnouncements}
                   onFiled={refreshAnnouncements}
+                  onDeleted={refreshAnnouncements}
                 />
               ))}
 
@@ -394,6 +400,7 @@ export default function BoardApp({ session }: { session: SessionPayload }) {
 
       {showCompose && (
         <ComposeForm
+          categories={categories}
           onClose={() => setShowCompose(false)}
           onPosted={() => {
             setShowCompose(false);

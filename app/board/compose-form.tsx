@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { MAX_ATTACHMENT_SIZE, MAX_ATTACHMENT_SIZE_LABEL } from '@/lib/attachments';
+import { getTagColor } from '@/lib/tagColors';
+import type { Category } from './announcement-card';
 
 interface AudiencePerson {
   id: string;
@@ -9,20 +11,25 @@ interface AudiencePerson {
   role: string;
 }
 
-type LeaderPreset = 'managers' | 'managers_and_ics' | 'custom';
+type LeaderPreset = 'managers' | 'managers_and_ics' | 'everyone' | 'custom';
 
 export default function ComposeForm({
+  categories,
   onClose,
   onPosted,
 }: {
+  categories: Category[];
   onClose: () => void;
   onPosted: () => void;
 }) {
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [files, setFiles] = useState<File[]>([]);
+  const [tag, setTag] = useState<string | null>(null);
   const [posting, setPosting] = useState(false);
   const [error, setError] = useState('');
+
+  const tagOptions = [...categories.map((c) => c.name), 'Action Required'];
 
   const [loadingAudience, setLoadingAudience] = useState(true);
   const [mode, setMode] = useState<'direct' | 'leader' | 'fixed' | 'none'>('none');
@@ -84,6 +91,9 @@ export default function ComposeForm({
           .filter((p) => p.role === 'Manager' || p.role === 'Senior Manager' || p.role === 'IC')
           .map((p) => p.id);
       }
+      if (leaderPreset === 'everyone') {
+        return people.map((p) => p.id);
+      }
       return Array.from(leaderCheckedIds);
     }
     return []; // 'fixed' mode: server computes recipients itself
@@ -103,7 +113,7 @@ export default function ComposeForm({
     const res = await fetch('/api/announcements', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title, body, recipientIds }),
+      body: JSON.stringify({ title, body, recipientIds, tag }),
     });
 
     if (!res.ok) {
@@ -263,6 +273,7 @@ export default function ComposeForm({
                 [
                   ['managers', 'All Managers'],
                   ['managers_and_ics', 'All Managers and ICs'],
+                  ['everyone', 'Everyone'],
                   ['custom', 'Choose specific people'],
                 ] as [LeaderPreset, string][]
               ).map(([value, label]) => (
@@ -305,17 +316,45 @@ export default function ComposeForm({
 
             {leaderPreset !== 'custom' && (
               <p className="text-[10px] text-white/30">
-                {leaderPreset === 'managers'
-                  ? `${people.filter((p) => p.role === 'Manager' || p.role === 'Senior Manager').length} managers will receive this.`
-                  : `${
-                      people.filter(
-                        (p) => p.role === 'Manager' || p.role === 'Senior Manager' || p.role === 'IC'
-                      ).length
-                    } people will receive this.`}
+                {leaderPreset === 'managers' &&
+                  `${people.filter((p) => p.role === 'Manager' || p.role === 'Senior Manager').length} managers will receive this.`}
+                {leaderPreset === 'managers_and_ics' &&
+                  `${
+                    people.filter(
+                      (p) => p.role === 'Manager' || p.role === 'Senior Manager' || p.role === 'IC'
+                    ).length
+                  } people will receive this.`}
+                {leaderPreset === 'everyone' &&
+                  `${people.length} people will receive this — every role below you, including Tier 3.`}
               </p>
             )}
           </div>
         )}
+
+        <label className="mt-4 block text-xs font-medium uppercase tracking-wide text-white/40">
+          Tag <span className="normal-case text-white/25">(optional — shows as a colored label)</span>
+        </label>
+        <div className="mt-1.5 flex flex-wrap gap-1.5">
+          {tagOptions.map((option) => {
+            const color = getTagColor(option);
+            const selected = tag === option;
+            return (
+              <button
+                key={option}
+                type="button"
+                onClick={() => setTag(selected ? null : option)}
+                className="rounded-full px-3 py-1 text-xs font-medium transition"
+                style={{
+                  backgroundColor: selected ? `${color}40` : `${color}15`,
+                  color,
+                  outline: selected ? `1px solid ${color}` : 'none',
+                }}
+              >
+                {option}
+              </button>
+            );
+          })}
+        </div>
 
         {error && (
           <p className="mt-3 whitespace-pre-wrap rounded-lg bg-red-500/10 px-3 py-2 text-xs text-red-300">{error}</p>
