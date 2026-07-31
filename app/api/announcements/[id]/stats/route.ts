@@ -33,7 +33,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
   // matters when a Director/SVP is looking at someone else's announcement.
   const authorId = announcement.author_id;
 
-  const breakdown = await sql`
+  let breakdown = await sql`
     WITH RECURSIVE tree AS (
       SELECT id, id AS root FROM people WHERE manager_id = ${authorId}
       UNION ALL
@@ -53,7 +53,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
     ORDER BY root_person.name
   `;
 
-  const members = await sql`
+  let members = await sql`
     WITH RECURSIVE tree AS (
       SELECT id, id AS root FROM people WHERE manager_id = ${authorId}
       UNION ALL
@@ -66,6 +66,34 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
       ON ar.recipient_id = tree.id AND ar.announcement_id = ${announcementId}
     ORDER BY p.name
   `;
+
+  // Some senders (Tier 3, or anyone using "Choose specific people" across
+  // teams) don't have a natural reporting-chain group to bucket recipients
+  // under -- the tree above comes back empty even though real recipients
+  // exist. Fall back to one flat group covering everyone who actually got it.
+  if (breakdown.length === 0) {
+    const flatMembers = await sql`
+      SELECT p.id, p.name, p.role, ar.acknowledged_at
+      FROM announcement_recipients ar
+      JOIN people p ON p.id = ar.recipient_id
+      WHERE ar.announcement_id = ${announcementId}
+      ORDER BY p.name
+    `;
+
+    if (flatMembers.length > 0) {
+      const ackCount = flatMembers.filter((m) => m.acknowledged_at).length;
+      members = flatMembers.map((m) => ({ ...m, root_id: authorId }));
+      breakdown = [
+        {
+          root_id: authorId,
+          root_name: 'All recipients',
+          total: String(flatMembers.length),
+          acknowledged: String(ackCount),
+          root_acknowledged: false,
+        },
+      ];
+    }
+  }
 
   const [overall] = await sql`
     SELECT COUNT(*) AS total, COUNT(acknowledged_at) AS acknowledged
