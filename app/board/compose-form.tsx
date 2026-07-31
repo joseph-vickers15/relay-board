@@ -114,17 +114,30 @@ export default function ComposeForm({
     }
 
     const data = await res.json();
+    const uploadErrors: string[] = [];
 
     for (const file of files) {
       const form = new FormData();
       form.append('file', file);
-      await fetch(`/api/announcements/${data.id}/attachments`, {
+      const uploadRes = await fetch(`/api/announcements/${data.id}/attachments`, {
         method: 'POST',
         body: form,
       });
+      if (!uploadRes.ok) {
+        const uploadData = await uploadRes.json().catch(() => ({}));
+        uploadErrors.push(`${file.name}: ${uploadData.error || 'upload failed'}`);
+      }
     }
 
     setPosting(false);
+
+    if (uploadErrors.length > 0) {
+      setError(
+        `Announcement sent, but some attachments failed:\n${uploadErrors.join('\n')}`
+      );
+      return;
+    }
+
     onPosted();
   }
 
@@ -305,7 +318,7 @@ export default function ComposeForm({
         )}
 
         {error && (
-          <p className="mt-3 rounded-lg bg-red-500/10 px-3 py-2 text-xs text-red-300">{error}</p>
+          <p className="mt-3 whitespace-pre-wrap rounded-lg bg-red-500/10 px-3 py-2 text-xs text-red-300">{error}</p>
         )}
 
         <div className="mt-5 flex justify-end gap-2">

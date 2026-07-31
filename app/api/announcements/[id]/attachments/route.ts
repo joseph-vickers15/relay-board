@@ -34,9 +34,18 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     );
   }
 
-  const blob = await put(`announcements/${announcementId}/${Date.now()}-${file.name}`, file, {
-    access: 'public',
-  });
+  let blob;
+  try {
+    blob = await put(`announcements/${announcementId}/${Date.now()}-${file.name}`, file, {
+      access: 'public',
+    });
+  } catch (err: any) {
+    console.error('Blob upload failed:', err);
+    return NextResponse.json(
+      { error: `Upload failed: ${err?.message || 'unknown error'}. Check that BLOB_READ_WRITE_TOKEN is set in Vercel.` },
+      { status: 500 }
+    );
+  }
 
   const [attachment] = await sql`
     INSERT INTO announcement_attachments

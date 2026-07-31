@@ -28,6 +28,8 @@ export default function BoardApp({ session }: { session: SessionPayload }) {
   const [showCompose, setShowCompose] = useState(false);
   const [showNewCategory, setShowNewCategory] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
+  const [annSort, setAnnSort] = useState<'newest' | 'oldest'>('newest');
+  const [annSearch, setAnnSearch] = useState('');
 
   // --- Ideas state ---
   const [ideaView, setIdeaView] = useState<IdeaView>('mine');
@@ -49,16 +51,20 @@ export default function BoardApp({ session }: { session: SessionPayload }) {
     setCategories(categoriesData.categories);
   }, []);
 
-  const loadAnnItems = useCallback(async (view: AnnouncementView) => {
-    setLoading(true);
-    let url = '/api/announcements?scope=inbox';
-    if (view.type === 'sent') url = '/api/announcements?scope=sent';
-    if (view.type === 'category') url = `/api/announcements?scope=category&categoryId=${view.id}`;
-    const res = await fetch(url);
-    const data = await res.json();
-    setAnnItems(data.announcements);
-    setLoading(false);
-  }, []);
+  const loadAnnItems = useCallback(
+    async (view: AnnouncementView, sort: 'newest' | 'oldest', search: string) => {
+      setLoading(true);
+      let url = `/api/announcements?scope=inbox&sort=${sort}&q=${encodeURIComponent(search)}`;
+      if (view.type === 'sent') url = `/api/announcements?scope=sent&sort=${sort}&q=${encodeURIComponent(search)}`;
+      if (view.type === 'category')
+        url = `/api/announcements?scope=category&categoryId=${view.id}&sort=${sort}&q=${encodeURIComponent(search)}`;
+      const res = await fetch(url);
+      const data = await res.json();
+      setAnnItems(data.announcements);
+      setLoading(false);
+    },
+    []
+  );
 
   const loadIdeaSummary = useCallback(async () => {
     const res = await fetch('/api/ideas/summary');
@@ -80,15 +86,24 @@ export default function BoardApp({ session }: { session: SessionPayload }) {
   }, [loadAnnSummary, loadIdeaSummary]);
 
   useEffect(() => {
-    if (mode === 'announcements') loadAnnItems(annView);
-  }, [mode, annView, loadAnnItems]);
+    if (mode !== 'announcements') return;
+    const timeout = setTimeout(() => {
+      loadAnnItems(annView, annSort, annSearch);
+    }, 250);
+    return () => clearTimeout(timeout);
+  }, [mode, annView, annSort, annSearch, loadAnnItems]);
 
   useEffect(() => {
     if (mode === 'ideas') loadIdeaItems(ideaView);
   }, [mode, ideaView, loadIdeaItems]);
 
+  function selectAnnView(view: AnnouncementView) {
+    setAnnSearch('');
+    setAnnView(view);
+  }
+
   function refreshAnnouncements() {
-    loadAnnItems(annView);
+    loadAnnItems(annView, annSort, annSearch);
     loadAnnSummary();
   }
 
@@ -158,7 +173,7 @@ export default function BoardApp({ session }: { session: SessionPayload }) {
         {mode === 'announcements' ? (
           <nav className="space-y-0.5">
             <button
-              onClick={() => setAnnView({ type: 'inbox' })}
+              onClick={() => selectAnnView({ type: 'inbox' })}
               className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm ${
                 annView.type === 'inbox' ? 'bg-white/10 text-white' : 'text-white/60 hover:bg-white/5'
               }`}
@@ -172,7 +187,7 @@ export default function BoardApp({ session }: { session: SessionPayload }) {
             </button>
 
             <button
-              onClick={() => setAnnView({ type: 'sent' })}
+              onClick={() => selectAnnView({ type: 'sent' })}
               className={`flex w-full items-center rounded-lg px-3 py-2 text-sm ${
                 annView.type === 'sent' ? 'bg-white/10 text-white' : 'text-white/60 hover:bg-white/5'
               }`}
@@ -186,7 +201,7 @@ export default function BoardApp({ session }: { session: SessionPayload }) {
             {categories.map((c) => (
               <button
                 key={c.id}
-                onClick={() => setAnnView({ type: 'category', id: c.id, name: c.name })}
+                onClick={() => selectAnnView({ type: 'category', id: c.id, name: c.name })}
                 className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm ${
                   annView.type === 'category' && annView.id === c.id
                     ? 'bg-white/10 text-white'
@@ -305,6 +320,35 @@ export default function BoardApp({ session }: { session: SessionPayload }) {
           <h2 className="mt-8 font-display text-lg font-bold text-white/90">
             {mode === 'announcements' ? annViewTitle : ideaViewTitle}
           </h2>
+
+          {mode === 'announcements' && (
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <input
+                value={annSearch}
+                onChange={(e) => setAnnSearch(e.target.value)}
+                placeholder="Search title or message…"
+                className="min-w-[200px] flex-1 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-white outline-none placeholder:text-white/30 focus:border-playon-teal"
+              />
+              <div className="flex rounded-lg bg-white/5 p-0.5 text-xs">
+                <button
+                  onClick={() => setAnnSort('newest')}
+                  className={`rounded-md px-2.5 py-1 ${
+                    annSort === 'newest' ? 'bg-white/15 text-white' : 'text-white/50'
+                  }`}
+                >
+                  Newest
+                </button>
+                <button
+                  onClick={() => setAnnSort('oldest')}
+                  className={`rounded-md px-2.5 py-1 ${
+                    annSort === 'oldest' ? 'bg-white/15 text-white' : 'text-white/50'
+                  }`}
+                >
+                  Oldest
+                </button>
+              </div>
+            </div>
+          )}
 
           <div className="mt-4 space-y-3">
             {loading && <p className="text-sm text-white/40">Loading…</p>}

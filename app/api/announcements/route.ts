@@ -104,6 +104,16 @@ export async function GET(request: NextRequest) {
 
   const scope = request.nextUrl.searchParams.get('scope') || 'inbox';
   const categoryId = request.nextUrl.searchParams.get('categoryId');
+  const searchTerm = request.nextUrl.searchParams.get('q') || '';
+  const searchPattern = `%${searchTerm}%`;
+  const sortOldestFirst = request.nextUrl.searchParams.get('sort') === 'oldest';
+
+  function applySort(rows: any[]): any[] {
+    const sorted = [...rows].sort(
+      (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+    );
+    return sortOldestFirst ? sorted : sorted.reverse();
+  }
 
   if (scope === 'sent') {
     const rows = await sql`
@@ -112,9 +122,12 @@ export async function GET(request: NextRequest) {
       FROM announcements a
       JOIN people p ON p.id = a.author_id
       WHERE a.author_id = ${session.personId}
-      ORDER BY a.created_at DESC
+        AND (${searchTerm} = '' OR a.title ILIKE ${searchPattern} OR a.body ILIKE ${searchPattern})
     `;
-    return NextResponse.json({ announcements: await attachFiles(rows), isAuthorView: true });
+    return NextResponse.json({
+      announcements: await attachFiles(applySort(rows)),
+      isAuthorView: true,
+    });
   }
 
   if (scope === 'category' && categoryId) {
@@ -128,9 +141,12 @@ export async function GET(request: NextRequest) {
       JOIN announcement_recipients ar
         ON ar.announcement_id = a.id AND ar.recipient_id = ${session.personId}
       WHERE f.person_id = ${session.personId} AND f.category_id = ${Number(categoryId)}
-      ORDER BY a.created_at DESC
+        AND (${searchTerm} = '' OR a.title ILIKE ${searchPattern} OR a.body ILIKE ${searchPattern})
     `;
-    return NextResponse.json({ announcements: await attachFiles(rows), isAuthorView: false });
+    return NextResponse.json({
+      announcements: await attachFiles(applySort(rows)),
+      isAuthorView: false,
+    });
   }
 
   // default: inbox — received, not yet filed anywhere
@@ -146,7 +162,10 @@ export async function GET(request: NextRequest) {
         SELECT 1 FROM announcement_filings f
         WHERE f.person_id = ${session.personId} AND f.announcement_id = a.id
       )
-    ORDER BY a.created_at DESC
+      AND (${searchTerm} = '' OR a.title ILIKE ${searchPattern} OR a.body ILIKE ${searchPattern})
   `;
-  return NextResponse.json({ announcements: await attachFiles(rows), isAuthorView: false });
+  return NextResponse.json({
+    announcements: await attachFiles(applySort(rows)),
+    isAuthorView: false,
+  });
 }
