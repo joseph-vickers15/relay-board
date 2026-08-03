@@ -29,6 +29,8 @@ export default function BoardApp({ session }: { session: SessionPayload }) {
   const [showCompose, setShowCompose] = useState(false);
   const [showNewCategory, setShowNewCategory] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
+  const [editingCategoryId, setEditingCategoryId] = useState<number | null>(null);
+  const [editCategoryName, setEditCategoryName] = useState('');
   const [annSort, setAnnSort] = useState<'newest' | 'oldest'>('newest');
   const [annSearch, setAnnSearch] = useState('');
 
@@ -112,6 +114,37 @@ export default function BoardApp({ session }: { session: SessionPayload }) {
   function refreshIdeas() {
     loadIdeaItems(ideaView);
     loadIdeaSummary();
+  }
+
+  function canManageCategory(c: Category): boolean {
+    if (session.role === 'Director' || session.role === 'SVP') return true;
+    return !c.is_default && c.created_by === session.personId;
+  }
+
+  async function handleRenameCategory(c: Category) {
+    const trimmed = editCategoryName.trim();
+    setEditingCategoryId(null);
+    if (!trimmed || trimmed === c.name) return;
+    await fetch(`/api/categories/${c.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: trimmed }),
+    });
+    loadAnnSummary();
+  }
+
+  async function handleDeleteCategory(c: Category) {
+    if (
+      !confirm(
+        `Delete category "${c.name}"? Anything anyone has filed here moves back to their Inbox. This can't be undone.`
+      )
+    )
+      return;
+    await fetch(`/api/categories/${c.id}`, { method: 'DELETE' });
+    if (annView.type === 'category' && annView.id === c.id) {
+      selectAnnView({ type: 'inbox' });
+    }
+    loadAnnSummary();
   }
 
   async function handleCreateCategory(e: React.FormEvent) {
@@ -217,22 +250,63 @@ export default function BoardApp({ session }: { session: SessionPayload }) {
             <p className="mt-4 px-3 text-[10px] font-semibold uppercase tracking-wide text-white/30">
               Categories
             </p>
-            {categories.map((c) => (
-              <button
-                key={c.id}
-                onClick={() => selectAnnView({ type: 'category', id: c.id, name: c.name })}
-                className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm ${
-                  annView.type === 'category' && annView.id === c.id
-                    ? 'bg-white/10 text-white'
-                    : 'text-white/60 hover:bg-white/5'
-                }`}
-              >
-                <span>{c.name}</span>
-                {c.filed_count > 0 && (
-                  <span className="text-[10px] text-white/40">{c.filed_count}</span>
-                )}
-              </button>
-            ))}
+            {categories.map((c) =>
+              editingCategoryId === c.id ? (
+                <form
+                  key={c.id}
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    handleRenameCategory(c);
+                  }}
+                  className="px-3 py-1"
+                >
+                  <input
+                    autoFocus
+                    value={editCategoryName}
+                    onChange={(e) => setEditCategoryName(e.target.value)}
+                    onBlur={() => handleRenameCategory(c)}
+                    className="w-full rounded-md border border-playon-teal bg-white/5 px-2 py-1 text-xs text-white outline-none"
+                  />
+                </form>
+              ) : (
+                <div key={c.id} className="group flex items-center rounded-lg hover:bg-white/5">
+                  <button
+                    onClick={() => selectAnnView({ type: 'category', id: c.id, name: c.name })}
+                    className={`flex flex-1 items-center justify-between rounded-lg px-3 py-2 text-sm ${
+                      annView.type === 'category' && annView.id === c.id
+                        ? 'bg-white/10 text-white'
+                        : 'text-white/60'
+                    }`}
+                  >
+                    <span>{c.name}</span>
+                    {c.filed_count > 0 && (
+                      <span className="text-[10px] text-white/40">{c.filed_count}</span>
+                    )}
+                  </button>
+                  {canManageCategory(c) && (
+                    <div className="hidden shrink-0 items-center gap-0.5 pr-2 group-hover:flex">
+                      <button
+                        title="Rename"
+                        onClick={() => {
+                          setEditingCategoryId(c.id);
+                          setEditCategoryName(c.name);
+                        }}
+                        className="rounded p-1 text-white/30 hover:text-white/70"
+                      >
+                        ✎
+                      </button>
+                      <button
+                        title="Delete"
+                        onClick={() => handleDeleteCategory(c)}
+                        className="rounded p-1 text-white/30 hover:text-red-400"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )
+            )}
 
             {showNewCategory ? (
               <form onSubmit={handleCreateCategory} className="px-3 pt-1">

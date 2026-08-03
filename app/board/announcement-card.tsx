@@ -29,6 +29,8 @@ export interface Category {
   id: number;
   name: string;
   filed_count: number;
+  created_by?: string;
+  is_default?: boolean;
 }
 
 interface StatsBreakdownRow {

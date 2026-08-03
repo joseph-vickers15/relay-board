@@ -9,11 +9,11 @@ export async function GET() {
   }
 
   const categories = await sql`
-    SELECT c.id, c.name, COUNT(f.id) AS filed_count
+    SELECT c.id, c.name, c.created_by, c.is_default, COUNT(f.id) AS filed_count
     FROM categories c
     LEFT JOIN announcement_filings f
       ON f.category_id = c.id AND f.person_id = ${session.personId}
-    GROUP BY c.id, c.name
+    GROUP BY c.id, c.name, c.created_by, c.is_default
     ORDER BY c.name
   `;
 
