@@ -2,35 +2,81 @@
 
 import { useState } from 'react';
 
-// Supports a simple markdown image syntax: ![alt text](https://url)
-// Anything matching that pattern renders as a clickable inline <img>
-// that opens a fullscreen lightbox when clicked; everything else
-// renders as plain text, preserving line breaks.
+// Handles three things in the raw text, in priority order:
+// 1. ![alt](url)  -> inline image, click to enlarge
+// 2. [text](url)  -> a clickable link with custom text
+// 3. any bare http(s):// URL -> auto-linked as-is
+const PATTERN =
+  /!\[([^\]]*)\]\((https?:\/\/[^\s)]+)\)|\[([^\]]*)\]\((https?:\/\/[^\s)]+)\)|(https?:\/\/[^\s<>()]+)/g;
+
+// Raw URLs often get trailing punctuation swept in ("check this out:
+// https://example.com."). This peels off trailing punctuation so it
+// renders as plain text after the link instead of being part of the URL.
+function splitTrailingPunctuation(url: string): { url: string; trailing: string } {
+  const match = url.match(/^(.*[^.,;:!?)\]}'"])([.,;:!?)\]}'"]*)$/);
+  if (!match) return { url, trailing: '' };
+  return { url: match[1], trailing: match[2] };
+}
+
 export function BodyContent({ body }: { body: string }) {
   const [expandedUrl, setExpandedUrl] = useState<string | null>(null);
 
-  const regex = /!\[([^\]]*)\]\((https?:\/\/[^\s)]+)\)/g;
   const parts: React.ReactNode[] = [];
   let lastIndex = 0;
   let match: RegExpExecArray | null;
   let key = 0;
+  const regex = new RegExp(PATTERN);
 
   while ((match = regex.exec(body)) !== null) {
     if (match.index > lastIndex) {
       parts.push(<span key={key++}>{body.slice(lastIndex, match.index)}</span>);
     }
-    const url = match[2];
-    const alt = match[1] || 'Attached image';
-    parts.push(
-      // eslint-disable-next-line @next/next/no-img-element
-      <img
-        key={key++}
-        src={url}
-        alt={alt}
-        onClick={() => setExpandedUrl(url)}
-        className="my-2 max-h-96 max-w-full cursor-zoom-in rounded-lg border border-white/10 transition hover:opacity-90"
-      />
-    );
+
+    if (match[2] !== undefined) {
+      // ![alt](url) -- inline image
+      const alt = match[1] || 'Attached image';
+      const url = match[2];
+      parts.push(
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          key={key++}
+          src={url}
+          alt={alt}
+          onClick={() => setExpandedUrl(url)}
+          className="my-2 max-h-96 max-w-full cursor-zoom-in rounded-lg border border-white/10 transition hover:opacity-90"
+        />
+      );
+    } else if (match[4] !== undefined) {
+      // [text](url) -- custom-text link
+      const text = match[3] || match[4];
+      parts.push(
+        <a
+          key={key++}
+          href={match[4]}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-playon-teal underline hover:text-white"
+        >
+          {text}
+        </a>
+      );
+    } else if (match[5] !== undefined) {
+      // bare URL -- auto-linked
+      const { url, trailing } = splitTrailingPunctuation(match[5]);
+      parts.push(
+        <a
+          key={key++}
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-playon-teal underline hover:text-white"
+        >
+          {url}
+        </a>
+      );
+      if (trailing) parts.push(<span key={key++}>{trailing}</span>);
+    }
+
     lastIndex = match.index + match[0].length;
   }
 
