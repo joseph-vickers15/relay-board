@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { getTagColor } from '@/lib/tagColors';
-import { renderBody } from '@/lib/renderBody';
+import { BodyContent } from '@/lib/renderBody';
 
 export interface AnnouncementAttachment {
   id: number;
@@ -170,7 +170,9 @@ export default function AnnouncementCard({
         </div>
       </div>
 
-      <div className="mt-3 whitespace-pre-wrap text-sm text-white/80">{renderBody(item.body)}</div>
+      <div className="mt-3 whitespace-pre-wrap text-sm text-white/80">
+        <BodyContent body={item.body} />
+      </div>
 
       {item.attachments && item.attachments.length > 0 && (
         <div className="mt-3 space-y-1.5">
