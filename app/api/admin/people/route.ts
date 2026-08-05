@@ -3,8 +3,9 @@ import bcrypt from 'bcryptjs';
 import { sql } from '@/lib/db';
 import { getSession } from '@/lib/session';
 import { isWithinAuthority, isPeopleLeader, slugify } from '@/lib/admin';
+import { defaultEmailForName } from '@/lib/emailPattern';
 
-const VALID_ROLES = ['SVP', 'Director', 'Senior Manager', 'Manager', 'Tier 3', 'IC'];
+const VALID_ROLES = ['SVP', 'Director', 'Senior Manager', 'Manager', 'Tier 3', 'Senior IC', 'IC'];
 
 export async function POST(request: NextRequest) {
   const session = await getSession();
@@ -15,7 +16,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Not authorized.' }, { status: 403 });
   }
 
-  const { name, role, managerId } = await request.json();
+  const { name, role, managerId, email } = await request.json();
   if (!name?.trim() || !role || !managerId) {
     return NextResponse.json(
       { error: 'Name, role, and manager are all required.' },
@@ -38,12 +39,13 @@ export async function POST(request: NextRequest) {
     id = `${id}-${Math.random().toString(36).slice(2, 6)}`;
   }
 
+  const finalEmail = (email || '').trim() || defaultEmailForName(name);
   const defaultHash = await bcrypt.hash('1234', 10);
 
   await sql`
-    INSERT INTO people (id, name, role, manager_id, password_hash, must_change_password)
-    VALUES (${id}, ${name.trim()}, ${role}, ${managerId}, ${defaultHash}, TRUE)
+    INSERT INTO people (id, name, role, manager_id, password_hash, must_change_password, email)
+    VALUES (${id}, ${name.trim()}, ${role}, ${managerId}, ${defaultHash}, TRUE, ${finalEmail})
   `;
 
-  return NextResponse.json({ success: true, id });
+  return NextResponse.json({ success: true, id, email: finalEmail });
 }

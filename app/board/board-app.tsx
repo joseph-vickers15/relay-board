@@ -15,7 +15,7 @@ type AnnouncementView =
   | { type: 'sent' }
   | { type: 'all-org' }
   | { type: 'category'; id: number; name: string };
-type IdeaView = 'mine' | 'action' | 'following';
+type IdeaView = 'mine' | 'action' | 'following' | 'implemented';
 
 export default function BoardApp({ session }: { session: SessionPayload }) {
   const [mode, setMode] = useState<Mode>('announcements');
@@ -173,7 +173,13 @@ export default function BoardApp({ session }: { session: SessionPayload }) {
       : annView.name;
 
   const ideaViewTitle =
-    ideaView === 'mine' ? 'My ideas' : ideaView === 'action' ? 'Needs my action' : 'Following';
+    ideaView === 'mine'
+      ? 'My ideas'
+      : ideaView === 'action'
+      ? 'Needs my action'
+      : ideaView === 'implemented'
+      ? 'Implemented (company-wide)'
+      : 'Following';
 
   return (
     <div className="flex min-h-screen bg-playon-ink text-white">
@@ -358,6 +364,14 @@ export default function BoardApp({ session }: { session: SessionPayload }) {
               }`}
             >
               Following
+            </button>
+            <button
+              onClick={() => setIdeaView('implemented')}
+              className={`flex w-full items-center rounded-lg px-3 py-2 text-sm ${
+                ideaView === 'implemented' ? 'bg-white/10 text-white' : 'text-white/60 hover:bg-white/5'
+              }`}
+            >
+              Implemented
             </button>
           </nav>
         )}

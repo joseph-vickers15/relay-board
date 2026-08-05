@@ -14,7 +14,7 @@ export async function GET() {
   }
 
   if (session.role === 'Tier 3') {
-    const [row] = await sql`SELECT COUNT(*) AS count FROM people WHERE role = 'IC'`;
+    const [row] = await sql`SELECT COUNT(*) AS count FROM people WHERE id != ${session.personId}`;
     return NextResponse.json({ mode: 'fixed', icCount: Number(row.count) });
   }
 

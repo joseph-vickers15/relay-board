@@ -92,7 +92,7 @@ export default function ComposeForm({
       }
       if (leaderPreset === 'managers_and_ics') {
         return people
-          .filter((p) => p.role === 'Manager' || p.role === 'Senior Manager' || p.role === 'IC')
+          .filter((p) => p.role === 'Manager' || p.role === 'Senior Manager' || p.role === 'IC' || p.role === 'Senior IC')
           .map((p) => p.id);
       }
       if (leaderPreset === 'everyone') {
@@ -338,7 +338,7 @@ export default function ComposeForm({
 
         {!loadingAudience && mode === 'fixed' && (
           <p className="mt-2 rounded-lg bg-white/5 px-3 py-2 text-xs text-white/60">
-            This always goes to every IC in the company ({icCount} people).
+            This always goes to everyone in the company ({icCount} people).
           </p>
         )}
 
@@ -426,7 +426,7 @@ export default function ComposeForm({
                 {leaderPreset === 'managers_and_ics' &&
                   `${
                     people.filter(
-                      (p) => p.role === 'Manager' || p.role === 'Senior Manager' || p.role === 'IC'
+                      (p) => p.role === 'Manager' || p.role === 'Senior Manager' || p.role === 'IC' || p.role === 'Senior IC'
                     ).length
                   } people will receive this.`}
                 {leaderPreset === 'everyone' &&

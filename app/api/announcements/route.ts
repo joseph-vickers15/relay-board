@@ -24,7 +24,7 @@ async function attachFiles(announcements: any[]) {
 // with the allowed set depending on the sender's role:
 // - Manager/Senior Manager: their own direct reports (default: all of them)
 // - Director/SVP: anyone below them in the org chart, their choice
-// - Tier 3: always every IC in the company, no picker
+// - Tier 3: always everyone in the company, no picker
 export async function POST(request: NextRequest) {
   const session = await getSession();
   if (!session) {
@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
   let finalRecipientIds: string[];
 
   if (session.role === 'Tier 3') {
-    const rows = await sql`SELECT id FROM people WHERE role = 'IC'`;
+    const rows = await sql`SELECT id FROM people WHERE id != ${session.personId}`;
     finalRecipientIds = rows.map((r) => r.id);
   } else if (MANAGER_ROLES.includes(session.role)) {
     const directReports = await sql`

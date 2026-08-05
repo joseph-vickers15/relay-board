@@ -44,7 +44,26 @@ export async function GET(request: NextRequest) {
   const me = session.personId;
 
   let ideas;
-  if (scope === 'action') {
+  if (scope === 'implemented') {
+    // Company-wide, visible to every role -- a shared highlight reel
+    // of ideas that actually went somewhere, not filtered by who's
+    // involved.
+    ideas = await sql`
+      SELECT i.id, i.title, i.body, i.status, i.created_at, i.updated_at,
+             author.name AS author_name, author.role AS author_role,
+             owner.id AS current_owner_id, owner.name AS current_owner_name,
+             owner.role AS current_owner_role,
+             NULL AS escalate_to_name,
+             EXISTS(
+               SELECT 1 FROM idea_followers f WHERE f.idea_id = i.id AND f.follower_id = ${me}
+             ) AS is_following
+      FROM ideas i
+      JOIN people author ON author.id = i.author_id
+      LEFT JOIN people owner ON owner.id = i.current_owner_id
+      WHERE i.status = 'implemented'
+      ORDER BY i.updated_at DESC
+    `;
+  } else if (scope === 'action') {
     ideas = await sql`
       SELECT i.id, i.title, i.body, i.status, i.created_at, i.updated_at,
              author.name AS author_name, author.role AS author_role,

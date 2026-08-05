@@ -4,7 +4,7 @@
 // Admin page, but for Step 1 it lives here as plain data so we can see it
 // and get the shape right first.
 
-export type Role = 'SVP' | 'Director' | 'Senior Manager' | 'Manager' | 'Tier 3' | 'IC';
+export type Role = 'SVP' | 'Director' | 'Senior Manager' | 'Manager' | 'Tier 3' | 'Senior IC' | 'IC';
 
 export interface Person {
   id: string; // stable slug, e.g. "casey-silcox"
