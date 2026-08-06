@@ -21,10 +21,14 @@ async function attachFiles(announcements: any[]) {
 }
 
 // Creates an announcement and sends it to a specific set of recipients,
-// with the allowed set depending on the sender's role:
+// with the allowed set depending on the sender's role. IMPORTANT: every
+// candidate pool below is scoped to the sender's own department --
+// deliberately NOT the org-chart tree, since the tree can technically
+// span departments (everyone eventually reports up to the SVP) but
+// boards must stay completely isolated per department.
 // - Manager/Senior Manager: their own direct reports (default: all of them)
-// - Director/SVP: anyone below them in the org chart, their choice
-// - Tier 3: always everyone in the company, no picker
+// - Director/SVP: anyone else in their department, their choice
+// - Tier 3: always everyone in their department, no picker
 export async function POST(request: NextRequest) {
   const session = await getSession();
   if (!session) {
@@ -39,11 +43,14 @@ export async function POST(request: NextRequest) {
   let finalRecipientIds: string[];
 
   if (session.role === 'Tier 3') {
-    const rows = await sql`SELECT id FROM people WHERE id != ${session.personId}`;
+    const rows = await sql`
+      SELECT id FROM people WHERE department_id = ${session.departmentId} AND id != ${session.personId}
+    `;
     finalRecipientIds = rows.map((r) => r.id);
   } else if (MANAGER_ROLES.includes(session.role)) {
     const directReports = await sql`
-      SELECT id FROM people WHERE manager_id = ${session.personId}
+      SELECT id FROM people
+      WHERE manager_id = ${session.personId} AND department_id = ${session.departmentId}
     `;
     const allowedIds = new Set(directReports.map((r) => r.id));
     const requested: string[] = Array.isArray(recipientIds) ? recipientIds : [];
@@ -51,15 +58,10 @@ export async function POST(request: NextRequest) {
     // Default to the whole team if nothing specific was chosen.
     finalRecipientIds = chosen.length > 0 ? chosen : Array.from(allowedIds);
   } else if (LEADER_ROLES.includes(session.role)) {
-    const descendants = await sql`
-      WITH RECURSIVE tree AS (
-        SELECT id FROM people WHERE manager_id = ${session.personId}
-        UNION ALL
-        SELECT p.id FROM people p JOIN tree t ON p.manager_id = t.id
-      )
-      SELECT id FROM tree
+    const deptMates = await sql`
+      SELECT id FROM people WHERE department_id = ${session.departmentId} AND id != ${session.personId}
     `;
-    const allowedIds = new Set(descendants.map((r) => r.id));
+    const allowedIds = new Set(deptMates.map((r) => r.id));
     const requested: string[] = Array.isArray(recipientIds) ? recipientIds : [];
     finalRecipientIds = requested.filter((id) => allowedIds.has(id));
     if (finalRecipientIds.length === 0) {

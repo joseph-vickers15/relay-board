@@ -11,13 +11,24 @@ export async function POST(request: NextRequest) {
   }
 
   const rows = await sql`
-    SELECT id, name, role, password_hash, must_change_password
-    FROM people
-    WHERE id = ${personId}
+    SELECT p.id, p.name, p.role, p.password_hash, p.must_change_password,
+           p.department_id, p.is_super_admin, d.name AS department_name
+    FROM people p
+    JOIN departments d ON d.id = p.department_id
+    WHERE p.id = ${personId}
   `;
 
   const person = rows[0] as
-    | { id: string; name: string; role: string; password_hash: string; must_change_password: boolean }
+    | {
+        id: string;
+        name: string;
+        role: string;
+        password_hash: string;
+        must_change_password: boolean;
+        department_id: number;
+        department_name: string;
+        is_super_admin: boolean;
+      }
     | undefined;
 
   if (!person) {
@@ -33,6 +44,9 @@ export async function POST(request: NextRequest) {
     personId: person.id,
     name: person.name,
     role: person.role,
+    departmentId: person.department_id,
+    departmentName: person.department_name,
+    isSuperAdmin: person.is_super_admin,
   });
 
   await sql`INSERT INTO login_events (person_id) VALUES (${person.id})`;

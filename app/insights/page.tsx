@@ -7,7 +7,7 @@ export default async function InsightsPage() {
   if (!session) {
     redirect('/');
   }
-  if (session.role !== 'Director' && session.role !== 'SVP') {
+  if (session.role !== 'Director' && session.role !== 'SVP' && !session.isSuperAdmin) {
     redirect('/board');
   }
 

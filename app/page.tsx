@@ -8,8 +8,15 @@ interface PersonOption {
   name: string;
 }
 
+interface DepartmentOption {
+  id: number;
+  name: string;
+}
+
 export default function LoginPage() {
   const router = useRouter();
+  const [departments, setDepartments] = useState<DepartmentOption[]>([]);
+  const [selectedDeptId, setSelectedDeptId] = useState('');
   const [people, setPeople] = useState<PersonOption[]>([]);
   const [selectedId, setSelectedId] = useState('');
   const [password, setPassword] = useState('');
@@ -18,10 +25,21 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    fetch('/api/people')
+    fetch('/api/departments')
+      .then((res) => res.json())
+      .then((data) => setDepartments(data.departments || []));
+  }, []);
+
+  useEffect(() => {
+    setSelectedId('');
+    if (!selectedDeptId) {
+      setPeople([]);
+      return;
+    }
+    fetch(`/api/people?departmentId=${selectedDeptId}`)
       .then((res) => res.json())
       .then((data) => setPeople(data.people || []));
-  }, []);
+  }, [selectedDeptId]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -83,16 +101,36 @@ export default function LoginPage() {
           </p>
 
           <label className="mt-6 block text-xs font-medium uppercase tracking-wide text-white/40">
+            Department
+          </label>
+          <select
+            value={selectedDeptId}
+            onChange={(e) => setSelectedDeptId(e.target.value)}
+            required
+            className="mt-2 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-white outline-none focus:border-playon-teal focus:ring-1 focus:ring-playon-teal"
+          >
+            <option value="" disabled>
+              — Choose your department —
+            </option>
+            {departments.map((dept) => (
+              <option key={dept.id} value={dept.id} className="bg-playon-ink">
+                {dept.name}
+              </option>
+            ))}
+          </select>
+
+          <label className="mt-4 block text-xs font-medium uppercase tracking-wide text-white/40">
             Your name
           </label>
           <select
             value={selectedId}
             onChange={(e) => setSelectedId(e.target.value)}
             required
-            className="mt-2 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-white outline-none focus:border-playon-teal focus:ring-1 focus:ring-playon-teal"
+            disabled={!selectedDeptId}
+            className="mt-2 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-white outline-none focus:border-playon-teal focus:ring-1 focus:ring-playon-teal disabled:opacity-40"
           >
             <option value="" disabled>
-              — Choose your name —
+              {selectedDeptId ? '— Choose your name —' : '— Pick a department first —'}
             </option>
             {people.map((person) => (
               <option key={person.id} value={person.id} className="bg-playon-ink">

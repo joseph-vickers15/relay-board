@@ -27,7 +27,9 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     return NextResponse.json({ error: 'This idea is already closed out.' }, { status: 400 });
   }
 
-  const [ownerPerson] = await sql`SELECT role, manager_id FROM people WHERE id = ${session.personId}`;
+  const [ownerPerson] = await sql`
+    SELECT role, manager_id, department_id FROM people WHERE id = ${session.personId}
+  `;
 
   if (action === 'acknowledge') {
     if (idea.status === 'submitted') {
@@ -47,7 +49,18 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       VALUES (${ideaId}, ${session.personId}, 'feedback', ${note})
     `;
   } else if (action === 'escalate') {
-    if (!ownerPerson.manager_id) {
+    // Even if a manager_id link exists (everyone eventually reports up to
+    // the SVP), escalating must stop at the edge of the department --
+    // boards stay isolated, so an idea can never cross into someone
+    // else's department just by walking the reporting chain.
+    let canEscalate = false;
+    if (ownerPerson.manager_id) {
+      const [manager] = await sql`
+        SELECT department_id FROM people WHERE id = ${ownerPerson.manager_id}
+      `;
+      canEscalate = !!manager && manager.department_id === ownerPerson.department_id;
+    }
+    if (!canEscalate) {
       return NextResponse.json(
         { error: 'There is nobody above you to escalate this to.' },
         { status: 400 }

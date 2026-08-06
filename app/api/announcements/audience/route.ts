@@ -14,28 +14,30 @@ export async function GET() {
   }
 
   if (session.role === 'Tier 3') {
-    const [row] = await sql`SELECT COUNT(*) AS count FROM people WHERE id != ${session.personId}`;
+    const [row] = await sql`
+      SELECT COUNT(*) AS count FROM people
+      WHERE department_id = ${session.departmentId} AND id != ${session.personId}
+    `;
     return NextResponse.json({ mode: 'fixed', icCount: Number(row.count) });
   }
 
   if (MANAGER_ROLES.includes(session.role)) {
     const people = await sql`
-      SELECT id, name, role FROM people WHERE manager_id = ${session.personId} ORDER BY name
+      SELECT id, name, role FROM people
+      WHERE manager_id = ${session.personId} AND department_id = ${session.departmentId}
+      ORDER BY name
     `;
     return NextResponse.json({ mode: 'direct', people });
   }
 
   if (LEADER_ROLES.includes(session.role)) {
+    // Deliberately department-scoped, not tree-scoped -- the org chart
+    // can span departments (everyone reports up to the SVP eventually)
+    // but boards stay isolated per department.
     const people = await sql`
-      WITH RECURSIVE tree AS (
-        SELECT id FROM people WHERE manager_id = ${session.personId}
-        UNION ALL
-        SELECT p.id FROM people p JOIN tree t ON p.manager_id = t.id
-      )
-      SELECT p.id, p.name, p.role
-      FROM people p
-      WHERE p.id IN (SELECT id FROM tree)
-      ORDER BY p.name
+      SELECT id, name, role FROM people
+      WHERE department_id = ${session.departmentId} AND id != ${session.personId}
+      ORDER BY name
     `;
     return NextResponse.json({ mode: 'leader', people });
   }

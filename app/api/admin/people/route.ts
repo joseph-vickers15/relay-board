@@ -11,7 +11,7 @@ export async function POST(request: NextRequest) {
   if (!session) {
     return NextResponse.json({ error: 'Not logged in.' }, { status: 401 });
   }
-  if (!(await isPeopleLeader(session.personId))) {
+  if (!session.isSuperAdmin && !(await isPeopleLeader(session.personId))) {
     return NextResponse.json({ error: 'Not authorized.' }, { status: 403 });
   }
 
@@ -40,9 +40,16 @@ export async function POST(request: NextRequest) {
 
   const defaultHash = await bcrypt.hash('1234', 10);
 
+  // The new person's department always follows whoever they report to --
+  // this is what lets a super admin add someone into any department just
+  // by picking the right manager, with no separate department selector needed.
   await sql`
-    INSERT INTO people (id, name, role, manager_id, password_hash, must_change_password)
-    VALUES (${id}, ${name.trim()}, ${role}, ${managerId}, ${defaultHash}, TRUE)
+    INSERT INTO people (id, name, role, manager_id, department_id, password_hash, must_change_password)
+    VALUES (
+      ${id}, ${name.trim()}, ${role}, ${managerId},
+      (SELECT department_id FROM people WHERE id = ${managerId}),
+      ${defaultHash}, TRUE
+    )
   `;
 
   return NextResponse.json({ success: true, id });

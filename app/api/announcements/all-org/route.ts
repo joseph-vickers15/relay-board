@@ -25,7 +25,8 @@ export async function GET(request: NextRequest) {
               WHERE ar.announcement_id = a.id AND ar.acknowledged_at IS NOT NULL) AS acknowledged_count
     FROM announcements a
     JOIN people p ON p.id = a.author_id
-    WHERE (${searchTerm} = '' OR a.title ILIKE ${searchPattern} OR a.body ILIKE ${searchPattern})
+    WHERE p.department_id = ${session.departmentId}
+      AND (${searchTerm} = '' OR a.title ILIKE ${searchPattern} OR a.body ILIKE ${searchPattern})
   `;
 
   const sorted = [...rows].sort(

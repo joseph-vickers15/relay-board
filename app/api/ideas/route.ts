@@ -45,9 +45,8 @@ export async function GET(request: NextRequest) {
 
   let ideas;
   if (scope === 'implemented') {
-    // Company-wide, visible to every role -- a shared highlight reel
-    // of ideas that actually went somewhere, not filtered by who's
-    // involved.
+    // Visible to every role, but scoped to the viewer's own department --
+    // each department gets its own separate highlight reel.
     ideas = await sql`
       SELECT i.id, i.title, i.body, i.status, i.created_at, i.updated_at,
              author.name AS author_name, author.role AS author_role,
@@ -60,7 +59,7 @@ export async function GET(request: NextRequest) {
       FROM ideas i
       JOIN people author ON author.id = i.author_id
       LEFT JOIN people owner ON owner.id = i.current_owner_id
-      WHERE i.status = 'implemented'
+      WHERE i.status = 'implemented' AND author.department_id = ${session.departmentId}
       ORDER BY i.updated_at DESC
     `;
   } else if (scope === 'action') {
@@ -76,7 +75,7 @@ export async function GET(request: NextRequest) {
       FROM ideas i
       JOIN people author ON author.id = i.author_id
       LEFT JOIN people owner ON owner.id = i.current_owner_id
-      LEFT JOIN people owner_mgr ON owner_mgr.id = owner.manager_id
+      LEFT JOIN people owner_mgr ON owner_mgr.id = owner.manager_id AND owner_mgr.department_id = owner.department_id
       WHERE i.current_owner_id = ${me} AND i.status NOT IN ('implemented', 'declined')
       ORDER BY i.updated_at DESC
     `;
@@ -93,7 +92,7 @@ export async function GET(request: NextRequest) {
       FROM ideas i
       JOIN people author ON author.id = i.author_id
       LEFT JOIN people owner ON owner.id = i.current_owner_id
-      LEFT JOIN people owner_mgr ON owner_mgr.id = owner.manager_id
+      LEFT JOIN people owner_mgr ON owner_mgr.id = owner.manager_id AND owner_mgr.department_id = owner.department_id
       WHERE EXISTS (
         SELECT 1 FROM idea_followers f2 WHERE f2.idea_id = i.id AND f2.follower_id = ${me}
       )
@@ -112,7 +111,7 @@ export async function GET(request: NextRequest) {
       FROM ideas i
       JOIN people author ON author.id = i.author_id
       LEFT JOIN people owner ON owner.id = i.current_owner_id
-      LEFT JOIN people owner_mgr ON owner_mgr.id = owner.manager_id
+      LEFT JOIN people owner_mgr ON owner_mgr.id = owner.manager_id AND owner_mgr.department_id = owner.department_id
       WHERE i.author_id = ${me}
       ORDER BY i.updated_at DESC
     `;

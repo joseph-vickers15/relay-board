@@ -1,17 +1,21 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { sql } from '@/lib/db';
 import { getSession } from '@/lib/session';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   const session = await getSession();
   if (!session) {
     return NextResponse.json({ error: 'Not logged in.' }, { status: 401 });
   }
-  if (session.role !== 'Director' && session.role !== 'SVP') {
+  if (session.role !== 'Director' && session.role !== 'SVP' && !session.isSuperAdmin) {
     return NextResponse.json({ error: 'Not authorized.' }, { status: 403 });
   }
+
+  const requestedDeptId = request.nextUrl.searchParams.get('departmentId');
+  const targetDeptId =
+    session.isSuperAdmin && requestedDeptId ? Number(requestedDeptId) : session.departmentId;
 
   const me = session.personId;
 
@@ -30,8 +34,9 @@ export async function GET() {
     FROM ideas i
     JOIN people author ON author.id = i.author_id
     LEFT JOIN people owner ON owner.id = i.current_owner_id
-    LEFT JOIN people owner_mgr ON owner_mgr.id = owner.manager_id
-    WHERE i.status NOT IN ('implemented', 'declined')
+    LEFT JOIN people owner_mgr
+      ON owner_mgr.id = owner.manager_id AND owner_mgr.department_id = owner.department_id
+    WHERE i.status NOT IN ('implemented', 'declined') AND author.department_id = ${targetDeptId}
     ORDER BY i.updated_at ASC
   `;
 

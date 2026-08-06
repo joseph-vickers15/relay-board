@@ -52,8 +52,20 @@ export default function InsightsApp({ session }: { session: SessionPayload }) {
   const [allIdeas, setAllIdeas] = useState<IdeaItem[]>([]);
   const [loadingIdeas, setLoadingIdeas] = useState(true);
 
-  function loadAllIdeas() {
-    fetch('/api/insights/ideas')
+  const [departments, setDepartments] = useState<{ id: number; name: string }[]>([]);
+  const [viewingDeptId, setViewingDeptId] = useState<number>(session.departmentId);
+
+  function loadInsights(deptId: number) {
+    const qs = session.isSuperAdmin ? `?departmentId=${deptId}` : '';
+    fetch(`/api/insights${qs}`)
+      .then((res) => res.json())
+      .then(setData);
+  }
+
+  function loadAllIdeas(deptId: number) {
+    setLoadingIdeas(true);
+    const qs = session.isSuperAdmin ? `?departmentId=${deptId}` : '';
+    fetch(`/api/insights/ideas${qs}`)
       .then((res) => res.json())
       .then((d) => {
         setAllIdeas(d.ideas || []);
@@ -62,11 +74,17 @@ export default function InsightsApp({ session }: { session: SessionPayload }) {
   }
 
   useEffect(() => {
-    fetch('/api/insights')
-      .then((res) => res.json())
-      .then(setData);
-    loadAllIdeas();
-  }, []);
+    if (session.isSuperAdmin) {
+      fetch('/api/departments')
+        .then((res) => res.json())
+        .then((d) => setDepartments(d.departments || []));
+    }
+  }, [session.isSuperAdmin]);
+
+  useEffect(() => {
+    loadInsights(viewingDeptId);
+    loadAllIdeas(viewingDeptId);
+  }, [viewingDeptId]);
 
   if (!data) {
     return (
@@ -90,11 +108,34 @@ export default function InsightsApp({ session }: { session: SessionPayload }) {
   return (
     <div className="min-h-screen bg-playon-ink px-8 py-8 text-white">
       <div className="mx-auto max-w-4xl">
-        <Link href="/board" className="text-xs text-white/40 hover:text-white/70">
-          ← Back to board
-        </Link>
-        <h1 className="mt-1 font-display text-xl font-bold">Insights</h1>
-        <p className="text-xs text-white/40">How the org is actually using Relay Board.</p>
+        <div className="flex items-start justify-between">
+          <div>
+            <Link href="/board" className="text-xs text-white/40 hover:text-white/70">
+              ← Back to board
+            </Link>
+            <h1 className="mt-1 font-display text-xl font-bold">Insights</h1>
+            <p className="text-xs text-white/40">How the org is actually using Relay Board.</p>
+          </div>
+
+          {session.isSuperAdmin && departments.length > 0 && (
+            <div>
+              <label className="block text-[10px] font-semibold uppercase tracking-wide text-white/30">
+                Viewing department
+              </label>
+              <select
+                value={viewingDeptId}
+                onChange={(e) => setViewingDeptId(Number(e.target.value))}
+                className="mt-1 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-white outline-none focus:border-playon-teal"
+              >
+                {departments.map((d) => (
+                  <option key={d.id} value={d.id} className="bg-playon-ink">
+                    {d.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+        </div>
 
         {/* Summary cards */}
         <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -247,7 +288,7 @@ export default function InsightsApp({ session }: { session: SessionPayload }) {
                   key={idea.id}
                   idea={idea}
                   myPersonId={session.personId}
-                  onChanged={loadAllIdeas}
+                  onChanged={() => loadAllIdeas(viewingDeptId)}
                   readOnly
                 />
               ))}

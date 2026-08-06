@@ -11,6 +11,7 @@ interface Person {
   manager_id: string | null;
   manager_name: string | null;
   must_change_password: boolean;
+  department_name: string;
 }
 
 const ROLES = ['SVP', 'Director', 'Senior Manager', 'Manager', 'Tier 3', 'Senior IC', 'IC'];
@@ -156,7 +157,7 @@ export default function AdminApp({ session }: { session: SessionPayload }) {
                 >
                   {people.map((p) => (
                     <option key={p.id} value={p.id} className="bg-playon-ink">
-                      {p.name}
+                      {p.name} ({p.department_name})
                     </option>
                   ))}
                 </select>
@@ -200,6 +201,7 @@ export default function AdminApp({ session }: { session: SessionPayload }) {
                   </p>
                   <p className="text-xs text-white/30">
                     Reports to {person.manager_name || '— (top of the org)'}
+                    <span className="ml-2 text-white/20">· {person.department_name}</span>
                     {person.must_change_password && (
                       <span className="ml-2 text-playon-teal">· still using default password</span>
                     )}
@@ -219,7 +221,7 @@ export default function AdminApp({ session }: { session: SessionPayload }) {
                           .filter((p) => p.id !== person.id)
                           .map((p) => (
                             <option key={p.id} value={p.id} className="bg-playon-ink">
-                              {p.name}
+                              {p.name} ({p.department_name})
                             </option>
                           ))}
                       </select>

@@ -242,7 +242,7 @@ export default function BoardApp({ session }: { session: SessionPayload }) {
               Sent by me
             </button>
 
-            {(session.role === 'Director' || session.role === 'SVP') && (
+            {(session.role === 'Director' || session.role === 'SVP' || session.isSuperAdmin) && (
               <button
                 onClick={() => selectAnnView({ type: 'all-org' })}
                 className={`flex w-full items-center rounded-lg px-3 py-2 text-sm ${
@@ -412,7 +412,7 @@ export default function BoardApp({ session }: { session: SessionPayload }) {
                   Admin
                 </Link>
               )}
-              {(session.role === 'Director' || session.role === 'SVP') && (
+              {(session.role === 'Director' || session.role === 'SVP' || session.isSuperAdmin) && (
                 <Link
                   href="/insights"
                   className="rounded-lg border border-white/15 px-4 py-2 text-sm text-white/70 hover:bg-white/5"

@@ -27,7 +27,12 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     return NextResponse.json({ error: 'Someone cannot manage themselves.' }, { status: 400 });
   }
 
-  await sql`UPDATE people SET manager_id = ${newManagerId} WHERE id = ${targetId}`;
+  await sql`
+    UPDATE people
+    SET manager_id = ${newManagerId},
+        department_id = (SELECT department_id FROM people WHERE id = ${newManagerId})
+    WHERE id = ${targetId}
+  `;
 
   return NextResponse.json({ success: true });
 }
