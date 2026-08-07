@@ -10,7 +10,7 @@ export async function GET() {
 
   if (session.isSuperAdmin) {
     const people = await sql`
-      SELECT p.id, p.name, p.role, p.manager_id, p.must_change_password,
+      SELECT p.id, p.name, p.role, p.manager_id, p.must_change_password, p.email,
              mgr.name AS manager_name, d.name AS department_name
       FROM people p
       LEFT JOIN people mgr ON mgr.id = p.manager_id
@@ -37,7 +37,7 @@ export async function GET() {
       UNION ALL
       SELECT p.id FROM people p JOIN tree t ON p.manager_id = t.id
     )
-    SELECT p.id, p.name, p.role, p.manager_id, p.must_change_password,
+    SELECT p.id, p.name, p.role, p.manager_id, p.must_change_password, p.email,
            mgr.name AS manager_name, d.name AS department_name
     FROM people p
     LEFT JOIN people mgr ON mgr.id = p.manager_id

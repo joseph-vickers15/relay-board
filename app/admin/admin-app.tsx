@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import type { SessionPayload } from '@/lib/types';
+import { defaultEmailForName } from '@/lib/emailPattern';
 
 interface Person {
   id: string;
@@ -12,6 +13,7 @@ interface Person {
   manager_name: string | null;
   must_change_password: boolean;
   department_name: string;
+  email: string | null;
 }
 
 const ROLES = ['SVP', 'Director', 'Senior Manager', 'Manager', 'Tier 3', 'Senior IC', 'IC'];
@@ -25,9 +27,13 @@ export default function AdminApp({ session }: { session: SessionPayload }) {
   const [newName, setNewName] = useState('');
   const [newRole, setNewRole] = useState('IC');
   const [newManagerId, setNewManagerId] = useState(session.personId);
+  const [newEmail, setNewEmail] = useState('');
 
   const [movingId, setMovingId] = useState<string | null>(null);
   const [moveTarget, setMoveTarget] = useState('');
+
+  const [editingEmailId, setEditingEmailId] = useState<string | null>(null);
+  const [editEmailValue, setEditEmailValue] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -51,7 +57,12 @@ export default function AdminApp({ session }: { session: SessionPayload }) {
     const res = await fetch('/api/admin/people', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: newName, role: newRole, managerId: newManagerId }),
+      body: JSON.stringify({
+        name: newName,
+        role: newRole,
+        managerId: newManagerId,
+        email: newEmail,
+      }),
     });
     const data = await res.json();
     if (!res.ok) {
@@ -59,9 +70,25 @@ export default function AdminApp({ session }: { session: SessionPayload }) {
       return;
     }
     setNewName('');
+    setNewEmail('');
     setShowAdd(false);
-    flash(`Added ${newName} with default password 1234.`);
+    flash(`Added ${newName} (${data.email}) with default password 1234.`);
     load();
+  }
+
+  async function handleEditEmail(personId: string) {
+    const trimmed = editEmailValue.trim();
+    setEditingEmailId(null);
+    if (!trimmed) return;
+    const res = await fetch(`/api/admin/people/${personId}/email`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: trimmed }),
+    });
+    if (res.ok) {
+      flash('Email updated.');
+      load();
+    }
   }
 
   async function handleResetPassword(person: Person) {
@@ -163,6 +190,19 @@ export default function AdminApp({ session }: { session: SessionPayload }) {
                 </select>
               </div>
             </div>
+
+            <div className="mt-3">
+              <label className="block text-xs text-white/40">
+                Email <span className="text-white/25">(leave blank to auto-generate)</span>
+              </label>
+              <input
+                value={newEmail}
+                onChange={(e) => setNewEmail(e.target.value)}
+                placeholder={newName ? defaultEmailForName(newName) : 'first.last@playonsports.com'}
+                className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none placeholder:text-white/25 focus:border-playon-teal"
+              />
+            </div>
+
             <p className="mt-3 text-xs text-white/30">
               New team members start with the password <span className="text-white/50">1234</span>{' '}
               and will be asked to set their own on first login.
@@ -206,6 +246,26 @@ export default function AdminApp({ session }: { session: SessionPayload }) {
                       <span className="ml-2 text-playon-teal">· still using default password</span>
                     )}
                   </p>
+                  {editingEmailId === person.id ? (
+                    <input
+                      autoFocus
+                      value={editEmailValue}
+                      onChange={(e) => setEditEmailValue(e.target.value)}
+                      onBlur={() => handleEditEmail(person.id)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleEditEmail(person.id)}
+                      className="mt-1 rounded-md border border-playon-teal bg-white/5 px-2 py-0.5 text-xs text-white outline-none"
+                    />
+                  ) : (
+                    <button
+                      onClick={() => {
+                        setEditingEmailId(person.id);
+                        setEditEmailValue(person.email || '');
+                      }}
+                      className="mt-0.5 text-xs text-white/40 hover:text-playon-teal hover:underline"
+                    >
+                      {person.email || 'No email set — click to add'}
+                    </button>
+                  )}
                 </div>
 
                 <div className="flex items-center gap-2">

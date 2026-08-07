@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import { sql } from '@/lib/db';
 import { getSession } from '@/lib/session';
 import { isWithinAuthority, isPeopleLeader, slugify } from '@/lib/admin';
+import { defaultEmailForName } from '@/lib/emailPattern';
 
 const VALID_ROLES = ['SVP', 'Director', 'Senior Manager', 'Manager', 'Tier 3', 'Senior IC', 'IC'];
 
@@ -15,7 +16,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Not authorized.' }, { status: 403 });
   }
 
-  const { name, role, managerId } = await request.json();
+  const { name, role, managerId, email } = await request.json();
   if (!name?.trim() || !role || !managerId) {
     return NextResponse.json(
       { error: 'Name, role, and manager are all required.' },
@@ -38,19 +39,20 @@ export async function POST(request: NextRequest) {
     id = `${id}-${Math.random().toString(36).slice(2, 6)}`;
   }
 
+  const finalEmail = (email || '').trim() || defaultEmailForName(name);
   const defaultHash = await bcrypt.hash('1234', 10);
 
   // The new person's department always follows whoever they report to --
   // this is what lets a super admin add someone into any department just
   // by picking the right manager, with no separate department selector needed.
   await sql`
-    INSERT INTO people (id, name, role, manager_id, department_id, password_hash, must_change_password)
+    INSERT INTO people (id, name, role, manager_id, department_id, password_hash, must_change_password, email)
     VALUES (
       ${id}, ${name.trim()}, ${role}, ${managerId},
       (SELECT department_id FROM people WHERE id = ${managerId}),
-      ${defaultHash}, TRUE
+      ${defaultHash}, TRUE, ${finalEmail}
     )
   `;
 
-  return NextResponse.json({ success: true, id });
+  return NextResponse.json({ success: true, id, email: finalEmail });
 }

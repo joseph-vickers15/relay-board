@@ -1,0 +1,8 @@
+{
+  "crons": [
+    { "path": "/api/cron/slack-reminders", "schedule": "0 14 * * *" },
+    { "path": "/api/cron/slack-reminders", "schedule": "0 15 * * *" },
+    { "path": "/api/cron/slack-reminders", "schedule": "0 0 * * *" },
+    { "path": "/api/cron/slack-reminders", "schedule": "0 1 * * *" }
+  ]
+}
